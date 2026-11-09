@@ -1,0 +1,96 @@
+rules_version = '2';
+// เกมสร้างปราสาท — Firestore Security Rules
+// ราคาไอเท็มในฟังก์ชัน prices() ต้องตรงกับ ITEMS ใน js/main.js ถ้าแก้ราคา ให้แก้ทั้งสองที่
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function cfg() { return get(/databases/$(database)/documents/config/app).data; }
+    function isAdmin() { return signedIn() && request.auth.token.email in cfg().adminEmails; }
+    function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function isTeacher() { return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userDoc().data.status == 'approved'; }
+    function isStaff() { return isAdmin() || isTeacher(); }
+    function isStudent() { return signedIn() && exists(/databases/$(database)/documents/studentAuth/$(request.auth.uid)); }
+    function mySid() { return get(/databases/$(database)/documents/studentAuth/$(request.auth.uid)).data.sid; }
+    function me() { return get(/databases/$(database)/documents/students/$(mySid())).data; }
+    function activeStudent() { return isStudent() && me().active == true; }
+    function subj(s) { return get(/databases/$(database)/documents/subjects/$(s)).data; }
+    function teachesSub(s) { return isAdmin() || (isTeacher() && request.auth.uid in subj(s).teacherUids); }
+    function inSub(s) { return activeStudent() && me().room in subj(s).rooms; }
+    function villageOpen(s) { return subj(s).get('village', {}).get(me().room, {}).get('until', 0) > request.time.toMillis(); }
+    function onlyKeys(k) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(k); }
+    function prices() { return {'out_knight': 50, 'out_wizard': 50, 'out_princess': 50, 'pet_cat': 20, 'pet_owl': 30, 'pet_dragon': 120, 'flag_red': 20, 'flag_blue': 20, 'flag_green': 20, 'dec_fountain': 50, 'dec_lamp': 30, 'dec_guard': 50, 'dec_cart_wood': 50, 'dec_cart_lux': 150, 'dec_tree': 40, 'dec_cannon': 60, 'dec_dragon': 120}; }
+    function validBuy() {
+      let oldInv = resource.data.get('inv', []);
+      let newInv = request.resource.data.inv;
+      let it = newInv[newInv.size() - 1];
+      return onlyKeys(['coins', 'inv'])
+        && newInv.size() == oldInv.size() + 1
+        && newInv.hasAll(oldInv)
+        && !(it in oldInv)
+        && it in prices()
+        && request.resource.data.coins == resource.data.coins - prices()[it]
+        && request.resource.data.coins >= 0;
+    }
+
+    match /config/app {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /users/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.status == 'pending'
+        && !request.auth.token.email.matches('.*@castle[.]local$');
+      allow update, delete: if isAdmin();
+    }
+    match /students/{sid} {
+      allow read: if isStaff() || (isStudent() && mySid() == sid);
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isTeacher() && onlyKeys(['uid', 'cardVer']));
+    }
+    match /studentAuth/{uid} {
+      allow read: if isStaff() || (signedIn() && request.auth.uid == uid);
+      allow write: if isStaff();
+    }
+    match /cardSecrets/{sid} {
+      allow read, write: if isStaff();
+    }
+    match /subjects/{s} {
+      allow get: if isStaff() || inSub(s);
+      // นักเรียนค้นรายวิชาของห้องตัวเองด้วย query (ข้อมูลวิชาไม่มีคะแนน)
+      allow list: if isStaff() || activeStudent();
+      allow create: if isAdmin() || (isTeacher() && request.auth.uid in request.resource.data.teacherUids);
+      allow update, delete: if teachesSub(s);
+
+      match /quests/{q} {
+        allow read: if teachesSub(s) || inSub(s);
+        allow write: if teachesSub(s);
+      }
+      match /progress/{sid} {
+        allow read: if teachesSub(s) || (inSub(s) && mySid() == sid);
+        allow create, delete: if teachesSub(s);
+        allow update: if teachesSub(s) || (inSub(s) && mySid() == sid && (onlyKeys(['eq']) || validBuy()));
+      }
+      match /public/{sid} {
+        allow get: if teachesSub(s) || (inSub(s) && resource.data.room == me().room && (mySid() == sid || villageOpen(s)));
+        // เห็นปราสาทเพื่อนร่วมห้องได้เฉพาะช่วงเปิดหมู่บ้าน (query ต้องกรอง room == ห้องของตัวเอง)
+        allow list: if teachesSub(s) || (inSub(s) && villageOpen(s) && resource.data.room == me().room);
+        allow create, delete: if teachesSub(s);
+        allow update: if teachesSub(s)
+          || (inSub(s) && mySid() == sid && onlyKeys(['eq', 'inv']))
+          || (inSub(s) && villageOpen(s) && resource.data.room == me().room && onlyKeys(['stickers'])
+              && request.resource.data.stickers == resource.data.get('stickers', 0) + 1);
+      }
+      match /claims/{c} {
+        allow read: if teachesSub(s) || (inSub(s) && resource.data.sid == mySid());
+        allow create: if inSub(s) && request.resource.data.sid == mySid() && request.resource.data.status == 'pending';
+        allow update, delete: if teachesSub(s);
+      }
+      match /trades/{t} {
+        allow read: if teachesSub(s) || (inSub(s) && (resource.data.from == mySid() || resource.data.to == mySid()));
+        allow create: if inSub(s) && villageOpen(s) && request.resource.data.from == mySid() && request.resource.data.status == 'pending';
+        allow update, delete: if teachesSub(s);
+      }
+    }
+  }
+}
