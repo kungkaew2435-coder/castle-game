@@ -184,6 +184,7 @@ const PH={plots:{x:6.6,y:63.2,w:48.6,h:31.8},
  zone:{chicken:[49,46,20,12],sheep:[58,28,18,12],pig:[80,52,15,8],horse:[82,19,14,11],fish:[71,66,24,18]}};
 const ph=d=>`animation-delay:-${((performance.now()/1000)%d).toFixed(2)}s`;
 const hsh=s=>{let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619);return (h>>>0)/4294967296};
+const GIRL=[26.5,62,5.8,18.5];
 const REVEAL=[[],
  [[41,56,6,12],[46,78,10,14],[52,92,12,10]],
  [[28,79,31,22]],
@@ -196,9 +197,8 @@ const REVEAL=[[],
  [[50,50,64,64]]];
 function revealStyle(stage){
  if(stage>=10)return '';
- const g=[];for(let k=1;k<=Math.min(stage,9);k++)(REVEAL[k]||[]).forEach(([x,y,rx,ry])=>g.push(`radial-gradient(ellipse ${rx}% ${ry}% at ${x}% ${y}%,#000 52%,transparent 100%)`));
- if(!g.length)return 'opacity:0;';
- const v=g.join(',');return `-webkit-mask-image:${v};mask-image:${v};-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;`;
+ const g=[];if(stage<10)g.push(`radial-gradient(ellipse ${GIRL[2]}% ${GIRL[3]}% at ${GIRL[0]}% ${GIRL[1]}%,#000 55%,transparent 100%)`);for(let k=1;k<=Math.min(stage,9);k++)(REVEAL[k]||[]).forEach(([x,y,rx,ry])=>g.push(`radial-gradient(ellipse ${rx}% ${ry}% at ${x}% ${y}%,#000 52%,transparent 100%)`));
+  const v=g.join(',');return `-webkit-mask-image:${v};mask-image:${v};-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;`;
 }
 function ambient(f,stage){
  let s='<div class="amb" aria-hidden="true"><i class="rays" style="'+ph(14)+'"></i><i class="cloud c1" style="'+ph(90)+'"></i><i class="cloud c2" style="'+ph(140)+'"></i>';
