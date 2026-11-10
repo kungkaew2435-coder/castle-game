@@ -191,12 +191,11 @@ function loginView(){
  return `<div class="login">
   <div class="login-card">
    <span class="brand">🌾 ฟาร์มพิชิตคะแนน</span>
-   <h1>ทำคะแนน สร้างฟาร์ม ขายของให้ครู</h1>
+   <h1>เก็บคะแนน ปั้นฟาร์ม<br>ขายของรับเหรียญ 🪙</h1>
    <p class="muted" style="margin:0">ทุกคะแนนที่สะสมทำให้ฟาร์มของคุณเติบโต ปลูกผัก เลี้ยงสัตว์ แล้วนำไปขายเป็นเหรียญพิเศษ</p>
    ${S.bootMsg?`<div class="banner bad"><b>${esc(S.bootMsg)}</b></div>`:''}
    <div class="seg big" role="tablist"><button class="${stu_?'on':''}" data-act="lmode" data-m="student">🎒 นักเรียน</button><button class="${!stu_?'on':''}" data-act="lmode" data-m="teacher">👩‍🏫 ครู</button></div>
-   ${stu_?`<div class="panel soft" style="display:flex;flex-direction:column;gap:10px"><div class="row"><button class="btn primary lg" data-act="scan-open">📷 สแกนบัตร QR</button><label class="btn lg" for="scan-file" style="cursor:pointer">🖼️ อัปโหลดรูปบัตร</label><input type="file" id="scan-file" accept="image/*" hidden data-act-change="scanfile"></div>
-    <label class="row small" style="gap:6px"><input type="checkbox" id="personal" data-act-change="personal" ${S.personal?'checked':''}> เครื่องส่วนตัว (จำการเข้าสู่ระบบ) · เครื่องห้องเรียนไม่ต้องติ๊ก</label></div>`
+   ${stu_?`<div class="panel soft" style="display:flex;flex-direction:column;gap:10px"><div class="row"><button class="btn primary lg" data-act="scan-open">📷 สแกนบัตร QR</button><label class="btn lg" for="scan-file" style="cursor:pointer">🖼️ อัปโหลดรูปบัตร</label><input type="file" id="scan-file" accept="image/*" hidden data-act-change="scanfile"></div></div>`
    :`<form class="panel soft" style="display:flex;flex-direction:column;gap:10px" data-form="tlogin"><label class="field">รหัสผู้ใช้งาน<input type="text" id="t-user" autocomplete="username" autocapitalize="none" placeholder="เช่น kru.somchai"></label><label class="field">รหัสผ่าน<input type="password" id="t-pass" autocomplete="current-password"></label><div><button class="btn primary lg" type="submit">เข้าสู่ระบบ</button></div><span class="small muted">รหัสผู้ใช้งานและรหัสผ่านขอได้จากผู้ดูแลระบบ</span></form>`}
    <div class="small muted" style="margin-top:4px">ผู้ดูแลระบบ <button class="linkbtn" data-act="login-google">เข้าสู่ระบบด้วย Google</button></div>
   </div>
