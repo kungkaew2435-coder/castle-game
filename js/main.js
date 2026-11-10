@@ -47,7 +47,7 @@ const plotCount=stage=>Math.min(12,2+stage);
 const defaultCats=()=>[{name:'คะแนนเก็บ',max:50,visible:true,castle:true},{name:'สอบกลางภาค',max:20,visible:true,castle:true},{name:'สอบปลายภาค',max:30,visible:false,castle:false}];
 const EMPTY_SUB={id:'__none',settings:{subject:'',code:'',level:'ม.4',term:SCHOOL.term,pass:50,prices:{},cats:defaultCats()},rooms:[],quests:[],claims:[],sales:[],farms:{},stats:null,helps:[],teacherUids:[]};
 const S={students:[],subjects:[],subId:'__none',user:null,tab:null,apView:'room',apStudent:null,room:null,sort:'no',modal:null,toast:null,
- boot:CONFIGURED?'loading':'noconfig',bootMsg:'',me:null,teachers:[],personal:false,loginMode:'student',lbSort:'earned',tsec:{},
+ boot:CONFIGURED?'loading':'noconfig',bootMsg:'',me:null,teachers:[],personal:true,loginMode:'student',lbSort:'earned',tsec:{},
  sell:{},plant:null,
  adm:{level:'ม.4',room:null,imp:null,cardLevel:'ม.4',cardRooms:[],addOpen:false,newT:null,showPw:{}}};
 const SUBKEYS=['settings','rooms','quests','claims','sales','farms','stats','helps'];
@@ -191,7 +191,7 @@ function loginView(){
  return `<div class="login">
   <div class="login-card">
    <span class="brand">🌾 ฟาร์มพิชิตคะแนน</span>
-   <h1>เก็บคะแนน ปั้นฟาร์ม<br>ขายของรับเหรียญ 🪙</h1>
+   <h1>ฟาร์มของฉัน<br>ยิ่งเก่ง ยิ่งรวย 🪙</h1>
    <p class="muted" style="margin:0">ทุกคะแนนที่สะสมทำให้ฟาร์มของคุณเติบโต ปลูกผัก เลี้ยงสัตว์ แล้วนำไปขายเป็นเหรียญพิเศษ</p>
    ${S.bootMsg?`<div class="banner bad"><b>${esc(S.bootMsg)}</b></div>`:''}
    <div class="seg big" role="tablist"><button class="${stu_?'on':''}" data-act="lmode" data-m="student">🎒 นักเรียน</button><button class="${!stu_?'on':''}" data-act="lmode" data-m="teacher">👩‍🏫 ครู</button></div>
