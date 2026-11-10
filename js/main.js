@@ -199,7 +199,7 @@ function loginView(){
    :`<form class="panel soft" style="display:flex;flex-direction:column;gap:10px" data-form="tlogin"><label class="field">รหัสผู้ใช้งาน<input type="text" id="t-user" autocomplete="username" autocapitalize="none" placeholder="เช่น kru.somchai"></label><label class="field">รหัสผ่าน<input type="password" id="t-pass" autocomplete="current-password"></label><div><button class="btn primary lg" type="submit">เข้าสู่ระบบ</button></div><span class="small muted">รหัสผู้ใช้งานและรหัสผ่านขอได้จากผู้ดูแลระบบ</span></form>`}
    <div class="small muted" style="margin-top:4px">ผู้ดูแลระบบ <button class="linkbtn" data-act="login-google">เข้าสู่ระบบด้วย Google</button></div>
   </div>
-  <div class="login-art">${demo}</div>
+  <div class="login-art"><img class="art-photo" src="img/farm.jpg" alt="ภาพฟาร์มในฝัน" width="1672" height="941" fetchpriority="high"></div>
  </div>`;
 }
 function subjSelect(st){const list=st?enrolled(st):S.subjects;if(!list.length)return '';
@@ -280,7 +280,7 @@ function sFarm(st){
   <div style="display:flex;flex-direction:column;gap:16px;min-width:0"><div class="panel"><div class="section-title"><h2>🐔 สัตว์เลี้ยง</h2>${ra?`<button class="btn sm primary" data-act="collect-all">เก็บผลผลิต (${ra})</button>`:''}</div><div class="list">${anim}</div></div>
   <div class="panel"><div class="section-title"><h2>📦 โกดังของฉัน</h2><button class="btn sm primary" data-act="tab" data-k="sell">ไปขายให้ครู</button></div><div class="chips">${stock}</div></div></div></div>
  <div class="grid2"><div class="panel"><h3 style="margin-bottom:8px">คะแนนที่สะสม</h3><div class="kv">${catRows}<span class="muted">เหรียญคงเหลือ</span><b class="num">${fmt(f.coins)}</b><span class="muted">เหรียญที่หามาได้รวม</span><b class="num">${fmt(f.earned)}</b></div></div>
- <div class="panel"><h3 style="margin-bottom:8px">ขั้นของฟาร์ม</h3><ol class="steps">${steps}</ol></div></div>`;
+ <div class="panel"><h3 style="margin-bottom:8px">ขั้นของฟาร์ม</h3><ol class="steps">${steps}</ol></div></div>${stage>=10?`<div class="panel"><div class="section-title"><h2>🏆 ฟาร์มสมบูรณ์แบบ!</h2></div><img class="art-photo" src="img/farm.jpg" alt="ฟาร์มสมบูรณ์แบบ" loading="lazy"></div>`:''}`;
 }
 function sSell(st){
  const f=farmOf(st.id);
