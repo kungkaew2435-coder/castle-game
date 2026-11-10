@@ -925,7 +925,13 @@ async function createTeacherAccount(name,username,pwd,prev){
 
 /* ---------- render & actions (ทุกการเปลี่ยนแปลงบันทึกลง Firestore) ---------- */
 const app=document.getElementById('app'),mroot=document.getElementById('modal-root');
+const SCR=['.main','.side','.tablewrap','.scrim'];
 function render(){
+ const keep=[app.scrollTop,...SCR.map(s=>[...app.querySelectorAll(s)].map(e=>e.scrollTop)),[...mroot.querySelectorAll('.scrim')].map(e=>e.scrollTop)];
+ renderInner();
+ app.scrollTop=keep[0];SCR.forEach((s,i)=>[...app.querySelectorAll(s)].forEach((e,j)=>{if(keep[i+1][j])e.scrollTop=keep[i+1][j]}));[...mroot.querySelectorAll('.scrim')].forEach((e,j)=>{if(keep[SCR.length+1][j])e.scrollTop=keep[SCR.length+1][j]});
+}
+function renderInner(){
  app.innerHTML=(S.boot==='ready'&&S.user?(S.user.role==='student'?studentApp():S.user.role==='admin'?adminApp():teacherApp()):loginView());
  mroot.innerHTML=modalView()+(S.toast?`<div class="toast" role="status">${esc(S.toast)}</div>`:'');
 }
