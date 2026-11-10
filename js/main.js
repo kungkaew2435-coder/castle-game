@@ -47,7 +47,7 @@ const plotCount=stage=>Math.min(12,2+stage);
 const defaultCats=()=>[{name:'คะแนนเก็บ',max:50,visible:true,castle:true},{name:'สอบกลางภาค',max:20,visible:true,castle:true},{name:'สอบปลายภาค',max:30,visible:false,castle:false}];
 const EMPTY_SUB={id:'__none',settings:{subject:'',code:'',level:'ม.4',term:SCHOOL.term,pass:50,prices:{},cats:defaultCats()},rooms:[],quests:[],claims:[],sales:[],farms:{},stats:null,helps:[],teacherUids:[]};
 const S={students:[],subjects:[],subId:'__none',user:null,tab:null,apView:'room',apStudent:null,room:null,sort:'no',modal:null,toast:null,
- boot:CONFIGURED?'loading':'noconfig',bootMsg:'',me:null,teachers:[],personal:true,loginMode:'student',lbSort:'earned',tsec:{},pickPlot:null,
+ boot:CONFIGURED?'loading':'noconfig',bootMsg:'',me:null,teachers:[],personal:true,loginMode:'student',lbSort:'earned',tsec:{},pickPlot:null,tilt:[0,0],
  sell:{},plant:null,
  adm:{level:'ม.4',room:null,imp:null,cardLevel:'ม.4',cardRooms:[],addOpen:false,newT:null,showPw:{}}};
 const SUBKEYS=['settings','rooms','quests','claims','sales','farms','stats','helps'];
@@ -178,14 +178,29 @@ function farmScene(f,stage,o={}){
  return s+'</svg>';
 }
 
-/* ---------- ฉากฟาร์มจากภาพจริง (ใช้เป็นฉากเล่น) ---------- */
+/* ---------- ฉากฟาร์มจากภาพจริง (ฉากเล่น 2.5D เคลื่อนไหวได้) ---------- */
 const PH={plots:{x:6.6,y:63.2,w:48.6,h:31.8},
- pen:{chicken:{x:58,y:55},sheep:{x:67.5,y:40},horse:{x:89,y:30},pig:{x:86,y:56},fish:{x:83,y:74}}};
+ pen:{chicken:{x:58,y:55},sheep:{x:67.5,y:40},horse:{x:89,y:30},pig:{x:86,y:56},fish:{x:83,y:74}},
+ zone:{chicken:[49,46,20,12],sheep:[58,28,18,12],pig:[80,52,15,8],horse:[82,19,14,11],fish:[71,66,24,18]}};
+const ph=d=>`animation-delay:-${((performance.now()/1000)%d).toFixed(2)}s`;
+const hsh=s=>{let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619);return (h>>>0)/4294967296};
+function ambient(f){
+ let s='<div class="amb" aria-hidden="true"><i class="rays" style="'+ph(14)+'"></i><i class="cloud c1" style="'+ph(90)+'"></i><i class="cloud c2" style="'+ph(140)+'"></i>';
+ [[8,70,'🐦'],[16,95,'🐦'],[5,120,'🕊️']].forEach(([top,d,e],i)=>{s+=`<b class="bird" style="top:${top+i*3}%;animation-duration:${d}s;${ph(d)}"><span style="animation-delay:-${(i*.3).toFixed(1)}s">${e}</span></b>`});
+ [[22,76,34],[14,82,45]].forEach(([x,y,d],i)=>{s+=`<b class="bfly" style="left:${x}%;top:${y}%;animation-duration:${d}s;${ph(d)}">🦋</b>`});
+ for(let i=0;i<6;i++)s+=`<i class="glint" style="left:${72+hsh('g'+i)*22}%;top:${66+hsh('h'+i)*18}%;animation-delay:-${(i*.7).toFixed(1)}s">✦</i>`;
+ const A=f&&f.animals||{};
+ for(const id of Object.keys(A)){const a=A[id],k=a.k;if(!PH.zone[k])continue;const z=PH.zone[k],r1=hsh(id+'x'),r2=hsh(id+'y'),r3=hsh(id+'d');
+  const dx=(r3<.5?-1:1)*(1.5+r1*3.5),dy=(r2-.5)*(k==='fish'?3:2.4),dur=k==='fish'?(9+r1*8):(14+r2*14);
+  s+=`<b class="wa ${k}" style="left:${(z[0]+r1*z[2]).toFixed(1)}%;top:${(z[1]+r2*z[3]).toFixed(1)}%;--dx:${dx.toFixed(1)}cqw;--dy:${dy.toFixed(1)}cqw;animation-duration:${dur.toFixed(1)}s;${ph(dur)}"><span style="animation-delay:-${(r3*2).toFixed(1)}s">${ANIMALS[k].em}</span></b>`}
+ return s+'</div>';
+}
 function photoScene(f,stage,o={}){
  const P=f.plots||{},n=plotCount(stage),sat=(0.3+0.07*stage).toFixed(2),bri=(0.86+0.014*stage).toFixed(2);
- const style=stage>=10?'':` style="filter:saturate(${sat}) brightness(${bri})"`;
- let s=`<div class="pscene${o.cls?' '+o.cls:''}" role="group" aria-label="${esc(o.label||'ฟาร์ม')}"><img class="pimg" src="img/farm.jpg" alt=""${style} draggable="false">`;
- if(o.bare)return s+'</div>';
+ const thumb=o.cls==='thumb',style=stage>=10?'':` style="filter:saturate(${sat}) brightness(${bri})"`,tl=S.tilt||[0,0];
+ let s=`<div class="pwrap"><div class="pscene${o.cls?' '+o.cls:''}" style="--px:${tl[0]};--py:${tl[1]}" role="group" aria-label="${esc(o.label||'ฟาร์ม')}"><div class="pback"><img class="pimg" src="img/farm.jpg" alt=""${style} draggable="false">${thumb?'':ambient(f)}</div>`;
+ if(o.bare)return s+'</div></div>';
+ s+='<div class="pfront">';
  const play=!!o.play,pick=play&&S.pickPlot&&!P[S.pickPlot]?S.pickPlot:null,B=play?'button':'div';
  const cw=PH.plots.w/4,ch=PH.plots.h/3;
  for(let i=0;i<12;i++){
@@ -207,7 +222,7 @@ function photoScene(f,stage,o={}){
  if(deco.length)s+=`<div class="pdeco" title="ของตกแต่ง">${deco.map(id=>`<span title="${esc(DECOR[id].name)}">${DECOR[id].em}</span>`).join('')}</div>`;
  s+=`<div class="pstage">ขั้น ${stage}/10</div>`;
  if(pick){const i=+pick.slice(1);s+=`<div class="seedbar"><b>แปลง ${i+1}</b>${Object.keys(CROPS).map(k=>`<button class="seed" data-act="plant" data-p="${pick}" data-k="${k}"><span>${CROPS[k].em}</span><small>${CROPS[k].name} · ${CROPS[k].grow}ชม.</small></button>`).join('')}<button class="btn sm ghost" data-act="pick" data-p="">ยกเลิก</button></div>`}
- return s+'</div>';
+ return s+'</div></div></div>';
 }
 
 /* ---------- views ---------- */
@@ -231,7 +246,7 @@ function loginView(){
    :`<form class="panel soft" style="display:flex;flex-direction:column;gap:10px" data-form="tlogin"><label class="field">รหัสผู้ใช้งาน<input type="text" id="t-user" autocomplete="username" autocapitalize="none" placeholder="เช่น kru.somchai"></label><label class="field">รหัสผ่าน<input type="password" id="t-pass" autocomplete="current-password"></label><div><button class="btn primary lg" type="submit">เข้าสู่ระบบ</button></div><span class="small muted">รหัสผู้ใช้งานและรหัสผ่านขอได้จากผู้ดูแลระบบ</span></form>`}
    <div class="small muted" style="margin-top:4px">ผู้ดูแลระบบ <button class="linkbtn" data-act="login-google">เข้าสู่ระบบด้วย Google</button></div>
   </div>
-  <div class="login-art"><img class="art-photo" src="img/farm.jpg" alt="ภาพฟาร์มในฝัน" width="1672" height="941" fetchpriority="high"></div>
+  <div class="login-art">${photoScene({},10,{bare:true,label:'ภาพฟาร์มในฝัน'})}</div>
  </div>`;
 }
 function subjSelect(st){const list=st?enrolled(st):S.subjects;if(!list.length)return '';
@@ -312,7 +327,7 @@ function sFarm(st){
   <div style="display:flex;flex-direction:column;gap:16px;min-width:0"><div class="panel"><div class="section-title"><h2>🐔 สัตว์เลี้ยง</h2>${ra?`<button class="btn sm primary" data-act="collect-all">เก็บผลผลิต (${ra})</button>`:''}</div><div class="list">${anim}</div></div>
   <div class="panel"><div class="section-title"><h2>📦 โกดังของฉัน</h2><button class="btn sm primary" data-act="tab" data-k="sell">ไปขายให้ครู</button></div><div class="chips">${stock}</div></div></div></div>
  <div class="grid2"><div class="panel"><h3 style="margin-bottom:8px">คะแนนที่สะสม</h3><div class="kv">${catRows}<span class="muted">เหรียญคงเหลือ</span><b class="num">${fmt(f.coins)}</b><span class="muted">เหรียญที่หามาได้รวม</span><b class="num">${fmt(f.earned)}</b></div></div>
- <div class="panel"><h3 style="margin-bottom:8px">ขั้นของฟาร์ม</h3><ol class="steps">${steps}</ol></div></div>${stage>=10?`<div class="panel"><div class="section-title"><h2>🏆 ฟาร์มสมบูรณ์แบบ!</h2></div><img class="art-photo" src="img/farm.jpg" alt="ฟาร์มสมบูรณ์แบบ" loading="lazy"></div>`:''}`;
+ <div class="panel"><h3 style="margin-bottom:8px">ขั้นของฟาร์ม</h3><ol class="steps">${steps}</ol></div></div>`;
 }
 function sSell(st){
  const f=farmOf(st.id);
@@ -973,6 +988,10 @@ const A={
   const b=writeBatch(db);b.delete(D('users',t.uid));b.delete(D('teacherLogin',d.u));b.delete(D('teacherSecrets',d.u));
   b.commit().then(()=>{S.teachers=S.teachers.filter(x=>x.username!==d.u);toast('ลบบัญชีครูแล้ว');soon()}).catch(e=>fail(e))},
 };
+let tiltRq=0;
+document.addEventListener('pointermove',e=>{const el=e.target.closest&&e.target.closest('.pscene');if(!el||el.classList.contains('thumb'))return;
+ if(tiltRq)return;tiltRq=requestAnimationFrame(()=>{tiltRq=0;const r=el.getBoundingClientRect();const x=Math.max(-1,Math.min(1,((e.clientX-r.left)/r.width-.5)*2)),y=Math.max(-1,Math.min(1,((e.clientY-r.top)/r.height-.5)*2));S.tilt=[+x.toFixed(2),+y.toFixed(2)];el.style.setProperty('--px',S.tilt[0]);el.style.setProperty('--py',S.tilt[1])})});
+document.addEventListener('pointerout',e=>{const el=e.target.closest&&e.target.closest('.pscene');if(!el||el.contains(e.relatedTarget))return;S.tilt=[0,0];el.style.setProperty('--px',0);el.style.setProperty('--py',0)});
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el||el.tagName==='SELECT'||el.tagName==='INPUT')return;const f=A[el.dataset.act];if(!f)return;if(f(el.dataset,el,e)===false)return;render()});
 document.addEventListener('submit',e=>{if(e.target.dataset&&e.target.dataset.form==='tlogin'){e.preventDefault();teacherLogin()}});
 document.addEventListener('change',e=>{const t=e.target;
