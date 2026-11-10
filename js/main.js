@@ -47,7 +47,7 @@ const plotCount=stage=>Math.min(12,2+stage);
 const defaultCats=()=>[{name:'คะแนนเก็บ',max:50,visible:true,castle:true},{name:'สอบกลางภาค',max:20,visible:true,castle:true},{name:'สอบปลายภาค',max:30,visible:false,castle:false}];
 const EMPTY_SUB={id:'__none',settings:{subject:'',code:'',level:'ม.4',term:SCHOOL.term,pass:50,prices:{},cats:defaultCats()},rooms:[],quests:[],claims:[],sales:[],farms:{},stats:null,helps:[],teacherUids:[]};
 const S={students:[],subjects:[],subId:'__none',user:null,tab:null,apView:'room',apStudent:null,room:null,sort:'no',modal:null,toast:null,
- boot:CONFIGURED?'loading':'noconfig',bootMsg:'',me:null,teachers:[],personal:true,loginMode:'student',lbSort:'earned',tsec:{},
+ boot:CONFIGURED?'loading':'noconfig',bootMsg:'',me:null,teachers:[],personal:true,loginMode:'student',lbSort:'earned',tsec:{},pickPlot:null,
  sell:{},plant:null,
  adm:{level:'ม.4',room:null,imp:null,cardLevel:'ม.4',cardRooms:[],addOpen:false,newT:null,showPw:{}}};
 const SUBKEYS=['settings','rooms','quests','claims','sales','farms','stats','helps'];
@@ -178,6 +178,38 @@ function farmScene(f,stage,o={}){
  return s+'</svg>';
 }
 
+/* ---------- ฉากฟาร์มจากภาพจริง (ใช้เป็นฉากเล่น) ---------- */
+const PH={plots:{x:6.6,y:63.2,w:48.6,h:31.8},
+ pen:{chicken:{x:58,y:55},sheep:{x:67.5,y:40},horse:{x:89,y:30},pig:{x:86,y:56},fish:{x:83,y:74}}};
+function photoScene(f,stage,o={}){
+ const P=f.plots||{},n=plotCount(stage),sat=(0.3+0.07*stage).toFixed(2),bri=(0.86+0.014*stage).toFixed(2);
+ const style=stage>=10?'':` style="filter:saturate(${sat}) brightness(${bri})"`;
+ let s=`<div class="pscene${o.cls?' '+o.cls:''}" role="group" aria-label="${esc(o.label||'ฟาร์ม')}"><img class="pimg" src="img/farm.jpg" alt=""${style} draggable="false">`;
+ if(o.bare)return s+'</div>';
+ const play=!!o.play,pick=play&&S.pickPlot&&!P[S.pickPlot]?S.pickPlot:null,B=play?'button':'div';
+ const cw=PH.plots.w/4,ch=PH.plots.h/3;
+ for(let i=0;i<12;i++){
+  const x=PH.plots.x+(i%4)*cw,y=PH.plots.y+Math.floor(i/4)*ch,pos=`left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;width:${(cw-.7).toFixed(2)}%;height:${(ch-1.1).toFixed(2)}%`;
+  const p=P['p'+i];
+  if(i>=n){s+=`<div class="ptile lock" style="${pos}" title="ปลดล็อกเมื่อคะแนนเพิ่ม">🔒</div>`;continue}
+  if(!p){s+=`<${B} class="ptile empty${pick==='p'+i?' sel':''}" style="${pos}" ${play?`data-act="pick" data-p="p${i}" aria-label="ปลูกแปลง ${i+1}"`:''}><span class="pe">＋</span></${B}>`;continue}
+  const I=plotInfo(p),C=CROPS[p.k];
+  s+=`<${B} class="ptile ${I.ready?'ready':'grow'}" style="${pos}" ${play&&I.ready?`data-act="harvest" data-p="p${i}" aria-label="เก็บเกี่ยว${C.name}"`:play?'disabled':''} title="${C.name}${I.ready?' พร้อมเก็บ':' อีก '+leftTxt(I.left)}"><span class="pe">${I.ready?C.em:'🌱'}</span><i class="pb"><u style="width:${(I.pct*100).toFixed(0)}%"></u></i>${I.ready?'<span class="spark">✨</span>':''}</${B}>`;
+ }
+ for(const k of Object.keys(ANIMALS)){
+  const A_=ANIMALS[k],q=PH.pen[k],list=animalsOf(f,k),ready=list.filter(id=>animInfo(f.animals[id]).ready);
+  const pos=`left:${q.x}%;top:${q.y}%`;
+  if(stage<A_.unlock){s+=`<div class="pen lock" style="${pos}" title="${A_.pen} ปลดล็อกที่ขั้น ${A_.unlock}"><span>🔒</span><b>ขั้น ${A_.unlock}</b></div>`;continue}
+  const act=play?(ready.length?`data-act="collect-kind" data-k="${k}"`:`data-act="tab" data-k="shop"`):'';
+  s+=`<${B} class="pen${ready.length?' ready':''}" style="${pos}" ${act} title="${A_.pen}: ${list.length}/${A_.max}${ready.length?' · กดเก็บผลผลิต':play?' · กดไปซื้อเพิ่ม':''}"><span>${A_.em}</span><b class="num">${list.length}/${A_.max}</b>${ready.length?`<em>${PRODUCTS[A_.prod].em}×${ready.length}</em>`:''}</${B}>`;
+ }
+ const deco=(f.inv||[]).filter(id=>DECOR[id]);
+ if(deco.length)s+=`<div class="pdeco" title="ของตกแต่ง">${deco.map(id=>`<span title="${esc(DECOR[id].name)}">${DECOR[id].em}</span>`).join('')}</div>`;
+ s+=`<div class="pstage">ขั้น ${stage}/10</div>`;
+ if(pick){const i=+pick.slice(1);s+=`<div class="seedbar"><b>แปลง ${i+1}</b>${Object.keys(CROPS).map(k=>`<button class="seed" data-act="plant" data-p="${pick}" data-k="${k}"><span>${CROPS[k].em}</span><small>${CROPS[k].name} · ${CROPS[k].grow}ชม.</small></button>`).join('')}<button class="btn sm ghost" data-act="pick" data-p="">ยกเลิก</button></div>`}
+ return s+'</div>';
+}
+
 /* ---------- views ---------- */
 const coinChip=n=>`<span class="chip gold num"><i class="coin"></i>${fmt(n)} เหรียญ</span>`;
 const ICON={home:'🏠',farm:'🌾',sell:'💰',shop:'🛒',visit:'🤝',quests:'🎯',sales:'💰',approve:'📝',farms:'🧑‍🌾',settings:'⚙️',rooms:'🏫',import:'📥',cards:'🪪',teachers:'👩‍🏫'};
@@ -271,7 +303,7 @@ function sFarm(st){
  const steps=STAGES.map((nm,i)=>`<li class="${i<stage?'done':i===stage?'now':'todo'}"><span class="dot">${i}</span><span>${nm}</span><span class="small muted num">${Math.ceil(i*I.max/10)}</span></li>`).join('');
  const catRows=cats().map((c,i)=>c.visible&&c.castle?`<span>${esc(c.name)}</span><b class="num">${catScore(st,i)}/${c.max}</b>`:'').join('');
  const helped=S.helps.filter(h=>h.farm===st.id);
- return `<div class="panel scenepanel"><div class="section-title"><h2>ฟาร์มของ ${esc(st.name)}</h2><span class="chip num">ขั้น ${stage}: ${STAGES[stage]}</span></div>${farmScene(f,stage,{label:`ฟาร์มของ ${st.name}`,title:'ฟาร์มของ '+st.name})}
+ return `<div class="panel scenepanel"><div class="section-title"><h2>ฟาร์มของ ${esc(st.name)}</h2><span class="chip num">ขั้น ${stage}: ${STAGES[stage]}</span></div>${photoScene(f,stage,{label:`ฟาร์มของ ${st.name}`,play:true})}
   <div><div class="bar" role="progressbar" aria-valuenow="${I.sc}" aria-valuemin="0" aria-valuemax="${I.max}"><i style="width:${(I.pct*100).toFixed(1)}%"></i></div>
   <p style="margin:8px 0 0">${I.stage>=10?'<b>คะแนนเต็มขั้นสูงสุดแล้ว</b> ฟาร์มสมบูรณ์แบบ!':`คะแนน <b class="num">${I.sc}/${I.max}</b> · อีก <b class="num">${I.toNext}</b> คะแนน จะได้ <b>${STAGES[I.stage+1]}</b>`}${I.stage!==stage?' <span class="small muted">(ฟาร์มจะอัปเดตขั้นเมื่อครูบันทึกคะแนน)</span>':''}</p>${helped.length?`<p class="small" style="margin:4px 0 0">💚 วันนี้เพื่อนมาช่วย ${helped.map(h=>h.type==='water'?'รดน้ำผัก':'ให้อาหารสัตว์').join(' และ ')} ให้คุณแล้ว</p>`:''}</div></div>
  <div class="grid2"><div class="panel"><div class="section-title"><h2>🥕 แปลงผัก</h2><span class="small muted">${n}/12 แปลง (ปลดล็อกเพิ่มตามคะแนน)</span></div>
@@ -323,7 +355,7 @@ function sVisit(st){
  const head=wk?`<div class="banner ok"><b>🎉 วันนี้เปิดเยี่ยมชมฟาร์มเพื่อน</b><span class="small">ช่วยรดน้ำผัก หรือให้อาหารสัตว์ ได้ครั้งละ +${HELP_COIN} เหรียญ · ฟาร์มหนึ่งรับความช่วยเหลือแต่ละอย่างได้วันละครั้ง</span><span class="grow"></span><span class="chip num">โควต้าวันนี้ ${used}/${HELP_QUOTA}</span></div>`
   :`<div class="banner"><b>🔒 ปิดเยี่ยมชมในวันจันทร์-ศุกร์</b><span class="small">เปิดทุกวันเสาร์-อาทิตย์ (${weekendInfo()}) · ดูฟาร์มเพื่อนได้ แต่ช่วยเหลือรับเหรียญได้เฉพาะวันหยุด</span></div>`;
  const cards=mates.map(([sid,f])=>{const hw=S.helps.some(h=>h.farm===sid&&h.type==='water'),hf=S.helps.some(h=>h.farm===sid&&h.type==='feed');
-  return `<button class="card visitc" data-act="visit" data-id="${sid}">${farmScene(f,f.stage,{cls:'thumb',label:'ฟาร์มของ '+f.name})}<span class="t">${esc(f.name)}</span><span class="small muted">ขั้น ${f.stage||0} · เลขที่ ${f.no||''}</span><span class="chips"><span class="chip ${hw?'':'good'}">💧 ${hw?'มีคนรดแล้ว':'รอรดน้ำ'}</span><span class="chip ${hf?'':'good'}">🌾 ${hf?'มีคนให้อาหารแล้ว':'รอให้อาหาร'}</span></span></button>`}).join('')||'<div class="panel muted">ยังไม่มีฟาร์มของเพื่อนในห้อง</div>';
+  return `<button class="card visitc" data-act="visit" data-id="${sid}">${photoScene(f,f.stage,{cls:'thumb',bare:true,label:'ฟาร์มของ '+f.name})}<span class="t">${esc(f.name)}</span><span class="small muted">ขั้น ${f.stage||0} · เลขที่ ${f.no||''}</span><span class="chips"><span class="chip ${hw?'':'good'}">💧 ${hw?'มีคนรดแล้ว':'รอรดน้ำ'}</span><span class="chip ${hf?'':'good'}">🌾 ${hf?'มีคนให้อาหารแล้ว':'รอให้อาหาร'}</span></span></button>`}).join('')||'<div class="panel muted">ยังไม่มีฟาร์มของเพื่อนในห้อง</div>';
  return head+`<div class="grid visit">${cards}</div>`;
 }
 function questRow(st,q){
@@ -359,7 +391,7 @@ function tFarms(){
  return `<div class="row between"><div class="row">${roomTabs}</div><div class="row small"><span class="chip good">ปลอดภัย ${cnt.good}</span><span class="chip warn">ต้องทำปลายภาค ${cnt.warn}</span><span class="chip crit">เสี่ยง ${cnt.crit}</span>
   <button class="btn sm" data-act="cards-room">บัตร QR ห้อง ${S.room}</button>
   <label class="row" style="gap:6px">เรียง <select id="sort" data-act-change="sort"><option value="no" ${S.sort==='no'?'selected':''}>เลขที่</option><option value="low" ${S.sort==='low'?'selected':''}>คะแนนน้อยสุด</option></select></label></div></div>
- ${R.length?'':'<div class="panel muted">ห้องนี้ยังไม่มีรายชื่อนักเรียน ผู้ดูแลนำเข้าได้จากห้องเรียนกลาง</div>'}<div class="grid visit">${R.map(([s,r,I])=>{const f=farmOf(s.id);return `<button class="card visitc risk-${r.k}" data-act="detail" data-id="${s.id}">${farmScene(f,f.stage,{cls:'thumb',label:'ฟาร์มของ '+s.name})}<span class="t">${s.no}. ${esc(s.name)}</span><span class="small muted num">ฟาร์มขั้น ${f.stage} · ${I.sc}/${I.max} คะแนน · 🪙 ${fmt(f.coins)}</span><span class="chip ${r.k}">${r.label}</span></button>`}).join('')}</div>
+ ${R.length?'':'<div class="panel muted">ห้องนี้ยังไม่มีรายชื่อนักเรียน ผู้ดูแลนำเข้าได้จากห้องเรียนกลาง</div>'}<div class="grid visit">${R.map(([s,r,I])=>{const f=farmOf(s.id);return `<button class="card visitc risk-${r.k}" data-act="detail" data-id="${s.id}">${photoScene(f,f.stage,{cls:'thumb',bare:true,label:'ฟาร์มของ '+s.name})}<span class="t">${s.no}. ${esc(s.name)}</span><span class="small muted num">ฟาร์มขั้น ${f.stage} · ${I.sc}/${I.max} คะแนน · 🪙 ${fmt(f.coins)}</span><span class="chip ${r.k}">${r.label}</span></button>`}).join('')}</div>
  <p class="small muted" style="margin:0">สถานะคำนวณจากเกณฑ์ผ่าน ${S.settings.pass} คะแนน และคะแนนปลายภาคเต็ม ${hiddenMax()} ที่นักเรียนไม่เห็น</p>`;
 }
 function saleCalc(s,sim){const f=farmOf(s.sid),stock=sim&&sim[s.sid]?sim[s.sid]:Object.assign({},f.stock);const actual={};let clamp=false;
@@ -545,7 +577,7 @@ function modalView(){
   const nPlots=Object.keys(f.plots||{}).length,nAn=Object.keys(f.animals||{}).length;
   const btn=(type,label,done,can,why)=>`<button class="btn lg ${done||!can?'':'primary'}" data-act="help" data-t="${type}" data-id="${m.id}" ${done||!can?'disabled':''}>${label}${done?' · มีคนช่วยแล้ววันนี้':!can?` · ${why}`:` +${HELP_COIN} เหรียญ`}</button>`;
   const self=m.id===me.id;
-  inner=`<div class="section-title"><h2>ฟาร์มของ ${esc(f.name)}</h2><button class="btn sm ghost" data-act="close">ปิด</button></div>${farmScene(f,f.stage||0,{label:'ฟาร์มของ '+f.name,title:'ฟาร์มของ '+f.name})}
+  inner=`<div class="section-title"><h2>ฟาร์มของ ${esc(f.name)}</h2><button class="btn sm ghost" data-act="close">ปิด</button></div>${photoScene(f,f.stage||0,{label:'ฟาร์มของ '+f.name})}
   ${self?'<p class="muted" style="margin:0">นี่คือฟาร์มของคุณเอง</p>':!wk?'<p class="muted" style="margin:0">🔒 ช่วยเพื่อนรับเหรียญได้เฉพาะวันเสาร์-อาทิตย์ ตอนนี้ชมฟาร์มได้อย่างเดียว</p>':`<div class="row">${btn('water','💧 รดน้ำผัก',hw,nPlots>0&&used<HELP_QUOTA,nPlots?'โควต้าวันนี้ครบแล้ว':'ยังไม่มีผักให้รด')}${btn('feed','🌾 ให้อาหารสัตว์',hf,nAn>0&&used<HELP_QUOTA,nAn?'โควต้าวันนี้ครบแล้ว':'ยังไม่มีสัตว์')}</div><p class="small muted" style="margin:0">โควต้าวันนี้ ${used}/${HELP_QUOTA} ครั้ง · แต่ละฟาร์มรับการรดน้ำและให้อาหารได้อย่างละ 1 ครั้งต่อวัน</p>`}`}
  if(m.type==='cards'){const list=ACT().filter(x=>x.room===m.room).sort((a,b)=>a.no-b.no);
   inner=`<div class="section-title"><h2>บัตร QR ห้อง ${esc(m.room)}</h2><button class="btn sm ghost" data-act="close">ปิด</button></div>
@@ -555,7 +587,7 @@ function modalView(){
  if(m.type==='detail'){const s=stu(m.id);const I=stageInfo(s),r=risk(s),f=farmOf(s.id);
   const qrows=S.quests.filter(q=>q.cat!=null).map(q=>`<tr><td>${esc(q.name)}</td><td class="small muted">${esc(cats()[q.cat]?.name||'')}</td><td><input type="number" id="sc-${s.id}-${q.id}" min="0" max="${q.points}" value="${s.scores[q.id]??''}" placeholder="-" data-score="${s.id}|${q.id}"> <span class="small muted num">/${q.points}</span></td></tr>`).join('');
   inner=`<div class="section-title"><h2>${s.no}. ${esc(s.name)} <span class="small muted">${s.room} · ${s.id}</span></h2><button class="btn sm ghost" data-act="close">ปิด</button></div>
-  ${farmScene(f,f.stage,{label:'ฟาร์มของ '+s.name,title:'ฟาร์มของ '+s.name})}
+  ${photoScene(f,f.stage,{label:'ฟาร์มของ '+s.name})}
   <div style="display:flex;flex-direction:column;gap:8px"><span class="chip ${r.k}" style="align-self:flex-start">${r.label}</span><span class="small">${r.detail}</span>
    <div class="kv">${cats().map((c,i)=>c.castle?`<span>${esc(c.name)}</span><b class="num">${catScore(s,i)}/${c.max}</b>`:`<span class="muted">${esc(c.name)} (ซ่อน)</span><span class="muted num">-/${c.max}</span>`).join('')}<span>ขั้นของฟาร์ม</span><b class="num">${f.stage}/10${I.stage!==f.stage?` (คำนวณได้ ${I.stage})`:''}</b><span>เหรียญคงเหลือ</span><b class="num">${fmt(f.coins)}</b><span>เหรียญที่หามาได้รวม</span><b class="num">${fmt(f.earned)}</b><span>ยอดขายให้ครู</span><b class="num">${fmt(f.sold)}</b></div>
    <div class="row"><button class="btn sm" data-act="coin" data-id="${s.id}">+10 เหรียญ</button><button class="btn sm" data-act="card-one" data-id="${s.id}">พิมพ์บัตร QR</button><button class="btn sm" data-act="reissue" data-id="${s.id}">ออกบัตรใหม่</button></div></div>
@@ -845,6 +877,9 @@ const A={
   seq(ks,k=>updateDoc(meFarmRef(),{[`plots.${k}`]:deleteField(),[`stock.${f.plots[k].k}`]:increment(1)}),n=>`เก็บเกี่ยว ${n} แปลงแล้ว`);return false},
  collect(d){const f=farmOf(S.user.id),a=f.animals[d.a];if(!a||!animInfo(a).ready)return false;const pr=ANIMALS[a.k].prod;
   updateDoc(meFarmRef(),{[`animals.${d.a}.t`]:serverTimestamp(),[`stock.${pr}`]:increment(1)}).then(()=>toast(`ได้${PRODUCTS[pr].name}แล้ว`)).catch(e=>fail(e,'เก็บผลผลิตไม่สำเร็จ'));return false},
+ pick(d){S.pickPlot=d.p||null},
+ 'collect-kind'(d){const f=farmOf(S.user.id);const ks=Object.keys(f.animals).filter(k=>f.animals[k].k===d.k&&animInfo(f.animals[k]).ready);
+  seq(ks,k=>updateDoc(meFarmRef(),{[`animals.${k}.t`]:serverTimestamp(),[`stock.${ANIMALS[d.k].prod}`]:increment(1)}),n=>`เก็บผลผลิต ${n} รายการแล้ว`);return false},
  'collect-all'(){const f=farmOf(S.user.id);const ks=Object.keys(f.animals).filter(k=>animInfo(f.animals[k]).ready);
   seq(ks,k=>updateDoc(meFarmRef(),{[`animals.${k}.t`]:serverTimestamp(),[`stock.${ANIMALS[f.animals[k].k].prod}`]:increment(1)}),n=>`เก็บผลผลิต ${n} รายการแล้ว`);return false},
  'buy-animal'(d){const f=farmOf(S.user.id),A_=ANIMALS[d.k],slot=freeSlot(f.animals,'a',16);
