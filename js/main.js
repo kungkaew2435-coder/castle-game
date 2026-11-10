@@ -254,7 +254,7 @@ function loginView(){
  return `<div class="login">
   <div class="login-card">
    <span class="brand">🌾 ฟาร์มพิชิตคะแนน</span>
-   <h1>ฟาร์มของฉัน<br>ยิ่งเก่ง ยิ่งรวย 🪙</h1>
+   <h1>ฟาร์มของฉัน<br>ยิ่งเก่ง ยิ่งรวย <i class="coin"></i></h1>
    <p class="muted" style="margin:0">ทุกคะแนนที่สะสมทำให้ฟาร์มของคุณเติบโต ปลูกผัก เลี้ยงสัตว์ แล้วนำไปขายเป็นเหรียญพิเศษ</p>
    ${S.bootMsg?`<div class="banner bad"><b>${esc(S.bootMsg)}</b></div>`:''}
    <div class="seg big" role="tablist"><button class="${stu_?'on':''}" data-act="lmode" data-m="student">🎒 นักเรียน</button><button class="${!stu_?'on':''}" data-act="lmode" data-m="teacher">👩‍🏫 ครู</button></div>
@@ -422,7 +422,7 @@ function tFarms(){
  return `<div class="row between"><div class="row">${roomTabs}</div><div class="row small"><span class="chip good">ปลอดภัย ${cnt.good}</span><span class="chip warn">ต้องทำปลายภาค ${cnt.warn}</span><span class="chip crit">เสี่ยง ${cnt.crit}</span>
   <button class="btn sm" data-act="cards-room">บัตร QR ห้อง ${S.room}</button>
   <label class="row" style="gap:6px">เรียง <select id="sort" data-act-change="sort"><option value="no" ${S.sort==='no'?'selected':''}>เลขที่</option><option value="low" ${S.sort==='low'?'selected':''}>คะแนนน้อยสุด</option></select></label></div></div>
- ${R.length?'':'<div class="panel muted">ห้องนี้ยังไม่มีรายชื่อนักเรียน ผู้ดูแลนำเข้าได้จากห้องเรียนกลาง</div>'}<div class="grid visit">${R.map(([s,r,I])=>{const f=farmOf(s.id);return `<button class="card visitc risk-${r.k}" data-act="detail" data-id="${s.id}">${photoScene(f,f.stage,{cls:'thumb',bare:true,label:'ฟาร์มของ '+s.name})}<span class="t">${s.no}. ${esc(s.name)}</span><span class="small muted num">ฟาร์มขั้น ${f.stage} · ${I.sc}/${I.max} คะแนน · 🪙 ${fmt(f.coins)}</span><span class="chip ${r.k}">${r.label}</span></button>`}).join('')}</div>
+ ${R.length?'':'<div class="panel muted">ห้องนี้ยังไม่มีรายชื่อนักเรียน ผู้ดูแลนำเข้าได้จากห้องเรียนกลาง</div>'}<div class="grid visit">${R.map(([s,r,I])=>{const f=farmOf(s.id);return `<button class="card visitc risk-${r.k}" data-act="detail" data-id="${s.id}">${photoScene(f,f.stage,{cls:'thumb',bare:true,label:'ฟาร์มของ '+s.name})}<span class="t">${s.no}. ${esc(s.name)}</span><span class="small muted num">ฟาร์มขั้น ${f.stage} · ${I.sc}/${I.max} คะแนน · <i class="coin"></i> ${fmt(f.coins)}</span><span class="chip ${r.k}">${r.label}</span></button>`}).join('')}</div>
  <p class="small muted" style="margin:0">สถานะคำนวณจากเกณฑ์ผ่าน ${S.settings.pass} คะแนน และคะแนนปลายภาคเต็ม ${hiddenMax()} ที่นักเรียนไม่เห็น</p>`;
 }
 function saleCalc(s,sim){const f=farmOf(s.sid),stock=sim&&sim[s.sid]?sim[s.sid]:Object.assign({},f.stock);const actual={};let clamp=false;
@@ -493,6 +493,17 @@ function subjPanel(){
  return `<div class="panel" style="display:flex;flex-direction:column;gap:12px"><div class="section-title"><h2>รายวิชาของฉัน</h2><button class="btn sm primary" data-act="subj-new">สร้างรายวิชาใหม่</button></div>
   <div class="grid">${cards}</div><span class="small muted">แต่ละวิชามีเกณฑ์คะแนน งาน ฟาร์ม และเหรียญแยกกัน นักเรียนห้องเดียวกันเรียนหลายวิชาได้ด้วยบัตรใบเดียว</span></div>`;
 }
+function qRow(q){
+ if(S.editQ===q.id){const C=cats(),sp=q.cat==null;
+  return `<div class="item small" style="flex-direction:column;align-items:stretch;gap:8px;background:#fff8e1"><b>แก้ไขงาน</b><div class="row">
+  <input type="text" id="eq-name" value="${esc(q.name)}" aria-label="ชื่องาน">
+  <select id="eq-cat" aria-label="หมวด">${C.map((c,i)=>`<option value="${i}" ${q.cat===i?'selected':''}>${esc(c.name)}</option>`).join('')}<option value="sp" ${sp?'selected':''}>ภารกิจพิเศษ (เหรียญ)</option></select>
+  <input type="number" id="eq-pts" min="1" value="${sp?q.coins:q.points}" aria-label="คะแนนหรือเหรียญ" style="width:90px">
+  <select id="eq-input" aria-label="วิธีให้คะแนน"><option value="check" ${q.input!=='score'?'selected':''}>ติ๊กถูก (ได้เต็ม)</option><option value="score" ${q.input==='score'?'selected':''}>กรอกคะแนน</option></select>
+  <label class="row small" style="gap:4px"><input type="checkbox" id="eq-claim" ${q.claim?'checked':''}> นักเรียนกดรับได้</label></div>
+  <div class="row"><button class="btn sm primary" data-act="q-edit-save" data-q="${q.id}">บันทึก</button><button class="btn sm" data-act="q-edit" data-q="">ยกเลิก</button></div></div>`}
+ const val=q.cat==null?`<span class="num">${q.coins} <i class="coin"></i>เหรียญ</span>`:`<span class="num">${q.points} คะแนน</span><span class="muted">${q.input==='check'?'ติ๊กถูก':'กรอกคะแนน'} · ${q.claim?'นักเรียนกดรับได้':'ครูให้คะแนน'}</span>`;
+ return `<div class="item small"><span class="grow">${esc(q.name)}</span><button class="btn sm ghost" data-act="q-edit" data-q="${q.id}">แก้ไข</button><button class="btn sm ghost" data-act="q-copy" data-q="${q.id}">คัดลอก</button><button class="btn sm ghost" data-act="q-del" data-q="${q.id}">ลบ</button>${val}</div>`}
 function tSettings(){
  const C=cats();const total=C.reduce((a,c)=>a+(Number(c.max)||0),0);
  const rows=C.map((c,i)=>{const used=S.quests.some(q=>q.cat===i);return `<tr><td><input type="text" id="cn${i}" value="${esc(c.name)}" data-cat="${i}|name"></td><td><input type="number" id="cm${i}" min="0" value="${c.max}" data-cat="${i}|max"></td>
@@ -500,8 +511,8 @@ function tSettings(){
   <td><button class="btn sm" data-act="cat-del" data-i="${i}" ${used?'disabled title="มีงานในหมวดนี้"':''}>ลบ</button></td></tr>`}).join('');
  const qs=C.map((c,i)=>{const list=S.quests.filter(q=>q.cat===i);const sum=list.reduce((a,q)=>a+q.points,0);
   const msg=!c.castle&&!list.length?`<span class="small muted">ใช้เป็นเกณฑ์เท่านั้น ครูไม่ได้กรอกผ่านระบบ</span>`:sum===Number(c.max)?`<span class="okline">รวม ${sum}/${c.max} ครบแล้ว</span>`:`<span class="warnline">รวม ${sum}/${c.max} ${sum<c.max?'ยังขาด '+(c.max-sum):'เกิน '+(sum-c.max)}</span>`;
-  return `<div style="margin-top:10px"><div class="section-title"><b>${esc(c.name)}</b>${msg}</div>${list.map(q=>`<div class="item small"><span class="grow">${esc(q.name)}</span><button class="btn sm ghost" data-act="q-del" data-q="${q.id}" title="ลบงาน">ลบ</button><span class="num">${q.points} คะแนน</span><span class="muted">${q.input==='check'?'ติ๊กถูก':'กรอกคะแนน'} · ${q.claim?'นักเรียนกดรับได้':'ครูให้คะแนน'}</span></div>`).join('')}</div>`}).join('');
- const sp=S.quests.filter(q=>q.cat==null).map(q=>`<div class="item small"><span class="grow">${esc(q.name)}</span><button class="btn sm ghost" data-act="q-del" data-q="${q.id}" title="ลบงาน">ลบ</button><span class="num">${q.coins} เหรียญ</span></div>`).join('');
+  return `<div style="margin-top:10px"><div class="section-title"><b>${esc(c.name)}</b>${msg}</div>${list.map(qRow).join('')}</div>`}).join('');
+ const sp=S.quests.filter(q=>q.cat==null).map(qRow).join('');
  return subjPanel()+`<div class="panel" style="display:flex;flex-direction:column;gap:12px">
   <div class="section-title"><h2>ข้อมูลวิชา: ${esc(S.settings.subject)}</h2>${S.subjects.length>1?(S.confirmDel?`<span class="row small"><span class="warnline">ลบวิชานี้และคะแนนทั้งหมด?</span><button class="btn sm" data-act="subj-del-yes" style="color:var(--crit)">ยืนยันลบ</button><button class="btn sm" data-act="subj-del-no">ยกเลิก</button></span>`:`<button class="btn sm ghost" data-act="subj-del">ลบรายวิชานี้</button>`):''}</div><div class="row">
   <label class="field">ชื่อวิชา<input type="text" id="subj" value="${esc(S.settings.subject)}" data-set="subject"></label>
@@ -522,7 +533,7 @@ function tSettings(){
    <select id="nq-cat" aria-label="หมวด">${C.map((c,i)=>`<option value="${i}">${esc(c.name)}</option>`).join('')}<option value="sp">ภารกิจพิเศษ (เหรียญ)</option></select>
    <input type="number" id="nq-pts" value="5" min="1" aria-label="คะแนนหรือเหรียญ">
    <select id="nq-input" aria-label="วิธีให้คะแนน"><option value="check">ติ๊กถูก (ได้เต็ม)</option><option value="score">กรอกคะแนน</option></select>
-   <label class="row small" style="gap:4px"><input type="checkbox" id="nq-claim" checked> นักเรียนกดรับได้</label>
+   <label class="row small" style="gap:4px"><input type="checkbox" id="nq-claim"> นักเรียนกดรับได้</label>
    <button class="btn sm primary" data-act="q-add">เพิ่มงาน</button></div></div>`;
 }
 /* ---------- admin (school data: rooms, roster import, QR cards, teacher approval) ---------- */
@@ -1043,6 +1054,14 @@ const A={
  'q-add'(){const n=document.getElementById('nq-name').value.trim();if(!n){toast('ใส่ชื่องานก่อน');return}const c=document.getElementById('nq-cat').value,p=Math.max(1,+document.getElementById('nq-pts').value||1),cl=document.getElementById('nq-claim').checked;
   const q=c==='sp'?{name:n,short:n.slice(0,14),cat:null,coins:p,claim:cl,order:Date.now()}:{name:n,short:n.slice(0,14),cat:+c,points:p,claim:cl,input:document.getElementById('nq-input').value,order:Date.now()};
   const id=newId('q');S.quests.push(Object.assign({id},q));setDoc(sref('quests',id),q).then(()=>toast('เพิ่มงานแล้ว')).catch(e=>fail(e))},
+ 'q-edit'(d){S.editQ=d.q||null},
+ 'q-copy'(d){const q=S.quests.find(x=>x.id===d.q);if(!q)return false;const {id:_,...rest}=q;const n=Object.assign({},rest,{name:q.name+' (สำเนา)',short:(q.name+' (สำเนา)').slice(0,14),order:Date.now()});const id=newId('q');S.quests.push(Object.assign({id},n));S.editQ=id;setDoc(sref('quests',id),n).then(()=>toast('คัดลอกงานแล้ว แก้ไขชื่อและคะแนนได้เลย')).catch(e=>fail(e))},
+ 'q-edit-save'(d){const q=S.quests.find(x=>x.id===d.q);if(!q)return;const g=i=>document.getElementById(i);const n=g('eq-name').value.trim();if(!n){toast('ใส่ชื่องานก่อน');return}
+  const c=g('eq-cat').value,p=Math.max(1,+g('eq-pts').value||1),cl=g('eq-claim').checked;
+  const u=c==='sp'?{name:n,short:n.slice(0,14),cat:null,coins:p,claim:cl,points:deleteField(),input:deleteField()}:{name:n,short:n.slice(0,14),cat:+c,points:p,claim:cl,input:g('eq-input').value,coins:deleteField()};
+  const loc=c==='sp'?{name:n,short:n.slice(0,14),cat:null,coins:p,claim:cl}:{name:n,short:n.slice(0,14),cat:+c,points:p,claim:cl,input:g('eq-input').value};
+  if(c==='sp'){delete q.points;delete q.input}else delete q.coins;Object.assign(q,loc);S.editQ=null;render();
+  updateDoc(sref('quests',q.id),u).then(()=>toast('บันทึกงานแล้ว')).catch(e=>fail(e));return false},
  'q-del'(d){deleteDoc(sref('quests',d.q)).then(()=>toast('ลบงานแล้ว')).catch(e=>fail(e))},
  /* ผู้ดูแลระบบ */
  'a-level'(d){S.adm.level=d.l;S.adm.room=null},
