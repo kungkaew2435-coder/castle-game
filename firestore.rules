@@ -1,4 +1,161 @@
 rules_version = '2';
+// ฟาร์มพิชิตคะแนน — Firestore Security Rules
+// ตารางเวลา/ราคาในฟังก์ชัน growMs() animalTable() decorTable() ต้องตรงกับ CROPS/ANIMALS/DECOR ใน js/main.js
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function cfg() { return get(/databases/$(database)/documents/config/app).data; }
+    function isAdmin() { return signedIn() && request.auth.token.email in cfg().adminEmails; }
+    function isTeacher() { return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved'; }
+    function isStaff() { return isAdmin() || isTeacher(); }
+    function isStudent() { return signedIn() && exists(/databases/$(database)/documents/studentAuth/$(request.auth.uid)); }
+    function mySid() { return get(/databases/$(database)/documents/studentAuth/$(request.auth.uid)).data.sid; }
+    function me() { return get(/databases/$(database)/documents/students/$(mySid())).data; }
+    function activeStudent() { return isStudent() && me().active == true; }
+    function subj(s) { return get(/databases/$(database)/documents/subjects/$(s)).data; }
+    function teachesSub(s) { return isAdmin() || (isTeacher() && request.auth.uid in subj(s).teacherUids); }
+    function inSub(s) { return activeStudent() && me().room in subj(s).rooms; }
+    function onlyKeys(k) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(k); }
+    function ms() { return request.time.toMillis(); }
+    // เวลาไทย (UTC+7): epoch เป็นวันพฤหัส จึงนับรอบ 7 วันจากพฤหัส เสาร์=2 อาทิตย์=3
+    function weekendNow() { return (ms() + 25200000) % 604800000 >= 172800000 && (ms() + 25200000) % 604800000 < 345600000; }
+    function dayOk(dn) { return dn is int && dn * 86400000 <= ms() + 25200000 && ms() + 25200000 < (dn + 1) * 86400000; }
+
+    function growMs(c) { return {'carrot': 10800000, 'tomato': 21600000, 'cabbage': 43200000, 'pumpkin': 86400000}[c]; }
+    function animalTable() { return {'chicken': [60, 4, 'egg', 21600000], 'sheep': [120, 6, 'wool', 43200000], 'pig': [200, 8, 'bacon', 86400000], 'horse': [250, 8, 'manure', 86400000], 'fish': [40, 9, 'fish', 43200000]}; }
+    function decorTable() { return {'d_flowers': [40, 1], 'd_scarecrow': [50, 2], 'd_mailbox': [40, 2], 'd_well': [80, 3], 'd_flag': [100, 3], 'd_hay': [60, 4], 'd_windmill': [200, 5], 'd_hive': [120, 6], 'd_greenhouse': [300, 8], 'd_tractor': [400, 9]}; }
+    function oldF() { return resource.data; }
+    function newF() { return request.resource.data; }
+    function oldPlots() { return oldF().get('plots', {}); }
+    function newPlots() { return newF().get('plots', {}); }
+    function oldAn() { return oldF().get('animals', {}); }
+    function newAn() { return newF().get('animals', {}); }
+    function plotsDiff() { return newPlots().diff(oldPlots()).affectedKeys(); }
+    function animDiff() { return newAn().diff(oldAn()).affectedKeys(); }
+    function stockPlus1(p) {
+      return newF().get('stock', {}).diff(oldF().get('stock', {})).affectedKeys() == [p].toSet()
+        && newF().stock[p] == oldF().get('stock', {}).get(p, 0) + 1;
+    }
+    // ปลูก: แปลงว่าง ชนิดพืชถูกต้อง เวลา = เวลาเซิร์ฟเวอร์ และแปลงนั้นต้องปลดล็อกแล้ว
+    function plantK(k, i) {
+      return onlyKeys(['plots']) && i < 2 + oldF().get('stage', 0)
+        && plotsDiff() == [k].toSet() && !(k in oldPlots())
+        && newPlots()[k].keys().hasOnly(['k', 't']) && newPlots()[k].k in ['carrot', 'tomato', 'cabbage', 'pumpkin']
+        && newPlots()[k].t == request.time;
+    }
+    function growMs_keys() { return ['carrot', 'tomato', 'cabbage', 'pumpkin']; }
+    // เก็บเกี่ยว: ต้องโตครบเวลา ลบแปลงออก และเพิ่มสินค้าในโกดังทีละ 1
+    function harvestK(k) {
+      return onlyKeys(['plots', 'stock']) && k in oldPlots() && !(k in newPlots()) && plotsDiff() == [k].toSet()
+        && oldPlots()[k].t.toMillis() + growMs(oldPlots()[k].k) <= ms()
+        && stockPlus1(oldPlots()[k].k);
+    }
+    // เก็บผลผลิตสัตว์: ครบรอบเวลา รีเซ็ตเวลา และเพิ่มสินค้าทีละ 1
+    function collectK(k) {
+      return onlyKeys(['animals', 'stock']) && k in oldAn() && k in newAn() && animDiff() == [k].toSet()
+        && newAn()[k].k == oldAn()[k].k && newAn()[k].t == request.time
+        && oldAn()[k].t.toMillis() + animalTable()[oldAn()[k].k][3] <= ms()
+        && stockPlus1(animalTable()[oldAn()[k].k][2]);
+    }
+    // ซื้อสัตว์: ถึงขั้นที่ปลดล็อก เหรียญพอ หักราคาถูกต้อง
+    function buyAnimalK(k) {
+      return onlyKeys(['coins', 'animals']) && animDiff() == [k].toSet() && !(k in oldAn())
+        && newAn()[k].keys().hasOnly(['k', 't']) && newAn()[k].k in animalTable() && newAn()[k].t == request.time
+        && oldF().get('stage', 0) >= animalTable()[newAn()[k].k][1]
+        && newF().coins == oldF().coins - animalTable()[newAn()[k].k][0] && newF().coins >= 0;
+    }
+    function validBuyDecor() {
+      let oldInv = oldF().get('inv', []);
+      let newInv = newF().inv;
+      let it = newInv[newInv.size() - 1];
+      return onlyKeys(['coins', 'inv']) && newInv.size() == oldInv.size() + 1 && newInv.hasAll(oldInv) && !(it in oldInv)
+        && it in decorTable() && oldF().get('stage', 0) >= decorTable()[it][1]
+        && newF().coins == oldF().coins - decorTable()[it][0] && newF().coins >= 0;
+    }
+    // รางวัลช่วยเพื่อน +5: ต้องมีเอกสาร helps ใหม่ที่ตัวเองสร้างในชุดเขียนเดียวกัน (ใช้ซ้ำไม่ได้)
+    function validHelpReward(s) {
+      let h = newF().lastHelp;
+      let hp = /databases/$(database)/documents/subjects/$(s)/helps/$(h);
+      return onlyKeys(['coins', 'earned', 'lastHelp']) && h is string && h != oldF().get('lastHelp', '')
+        && newF().coins == oldF().coins + 5 && newF().earned == oldF().earned + 5
+        && existsAfter(hp) && !exists(hp) && getAfter(hp).data.by == mySid();
+    }
+    function studentFarmWrite(s) {
+      return plantK('p0',0) || plantK('p1',1) || plantK('p2',2) || plantK('p3',3) || plantK('p4',4) || plantK('p5',5) || plantK('p6',6) || plantK('p7',7) || plantK('p8',8) || plantK('p9',9) || plantK('p10',10) || plantK('p11',11) || harvestK('p0') || harvestK('p1') || harvestK('p2') || harvestK('p3') || harvestK('p4') || harvestK('p5') || harvestK('p6') || harvestK('p7') || harvestK('p8') || harvestK('p9') || harvestK('p10') || harvestK('p11') || collectK('a0') || collectK('a1') || collectK('a2') || collectK('a3') || collectK('a4') || collectK('a5') || collectK('a6') || collectK('a7') || collectK('a8') || collectK('a9') || collectK('a10') || collectK('a11') || collectK('a12') || collectK('a13') || collectK('a14') || collectK('a15') || buyAnimalK('a0') || buyAnimalK('a1') || buyAnimalK('a2') || buyAnimalK('a3') || buyAnimalK('a4') || buyAnimalK('a5') || buyAnimalK('a6') || buyAnimalK('a7') || buyAnimalK('a8') || buyAnimalK('a9') || buyAnimalK('a10') || buyAnimalK('a11') || buyAnimalK('a12') || buyAnimalK('a13') || buyAnimalK('a14') || buyAnimalK('a15') || validBuyDecor() || validHelpReward(s);
+    }
+
+    match /config/app { allow read: if signedIn(); allow write: if false; }
+    // ครูเข้าสู่ระบบด้วยรหัสผู้ใช้งาน: อ่านเวอร์ชันบัญชีได้ก่อนเข้าสู่ระบบ (ไม่มีรหัสผ่าน)
+    match /teacherLogin/{u} { allow get: if true; allow list: if false; allow write: if isAdmin(); }
+    match /teacherSecrets/{u} { allow read, write: if isAdmin(); }
+    match /users/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create, update, delete: if isAdmin();
+    }
+    match /students/{sid} {
+      allow read: if isStaff() || (isStudent() && mySid() == sid);
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isTeacher() && onlyKeys(['uid', 'cardVer']));
+    }
+    match /studentAuth/{uid} { allow read: if isStaff() || (signedIn() && request.auth.uid == uid); allow write: if isStaff(); }
+    match /cardSecrets/{sid} { allow read, write: if isStaff(); }
+    match /subjects/{s} {
+      allow get: if isStaff() || inSub(s);
+      allow list: if isStaff() || activeStudent();
+      allow create: if isAdmin() || (isTeacher() && request.auth.uid in request.resource.data.teacherUids);
+      allow update, delete: if teachesSub(s);
+
+      match /quests/{q} { allow read: if teachesSub(s) || inSub(s); allow write: if teachesSub(s); }
+      match /progress/{sid} {
+        allow read: if teachesSub(s) || (inSub(s) && mySid() == sid);
+        allow write: if teachesSub(s);
+      }
+      // ฟาร์ม: ทุกคนในวิชาเห็นฟาร์มและอันดับ นักเรียนแก้ได้เฉพาะของตัวเองตามกติกาด้านบน
+      match /farms/{sid} {
+        allow read: if teachesSub(s) || inSub(s);
+        allow create, delete: if teachesSub(s);
+        allow update: if teachesSub(s) || (inSub(s) && mySid() == sid && studentFarmWrite(s));
+      }
+      match /stats/{d} { allow read: if teachesSub(s) || inSub(s); allow write: if teachesSub(s); }
+      match /claims/{c} {
+        allow read: if teachesSub(s) || (inSub(s) && resource.data.sid == mySid());
+        allow create: if inSub(s) && request.resource.data.sid == mySid() && request.resource.data.status == 'pending';
+        allow update, delete: if teachesSub(s);
+      }
+      match /sales/{x} {
+        allow read: if teachesSub(s) || (inSub(s) && resource.data.sid == mySid());
+        allow create: if inSub(s) && request.resource.data.sid == mySid() && request.resource.data.status == 'pending'
+          && request.resource.data.keys().hasOnly(['sid', 'room', 'items', 'status', 'at', 'atMs']);
+        allow update, delete: if teachesSub(s);
+      }
+      // เยี่ยมฟาร์ม: เสาร์-อาทิตย์เท่านั้น ฟาร์มละ 1 ครั้ง/ประเภท/วัน และคนละไม่เกิน 3 ครั้ง/วัน
+      match /helps/{h} {
+        allow read: if teachesSub(s) || inSub(s);
+        allow create: if inSub(s) && weekendNow()
+          && request.resource.data.keys().hasOnly(['by', 'farm', 'type', 'dn', 'q', 'at'])
+          && request.resource.data.by == mySid() && request.resource.data.farm != mySid()
+          && request.resource.data.type in ['water', 'feed'] && dayOk(request.resource.data.dn)
+          && h == string(request.resource.data.dn) + '_' + request.resource.data.farm + '_' + request.resource.data.type
+          && request.resource.data.at == request.time
+          && get(/databases/$(database)/documents/subjects/$(s)/farms/$(request.resource.data.farm)).data.room == me().room
+          && existsAfter(/databases/$(database)/documents/subjects/$(s)/visits/$(request.resource.data.q));
+        allow update, delete: if teachesSub(s);
+      }
+      match /visits/{v} {
+        allow read: if teachesSub(s);
+        allow create: if inSub(s) && weekendNow()
+          && request.resource.data.keys().hasOnly(['by', 'dn', 'n', 'help'])
+          && request.resource.data.by == mySid() && request.resource.data.n in [1, 2, 3] && dayOk(request.resource.data.dn)
+          && v == string(request.resource.data.dn) + '_' + request.resource.data.by + '_' + string(request.resource.data.n)
+          && (request.resource.data.n == 1 || exists(/databases/$(database)/documents/subjects/$(s)/visits/$(string(request.resource.data.dn) + '_' + request.resource.data.by + '_' + string(request.resource.data.n - 1))))
+          && existsAfter(/databases/$(database)/documents/subjects/$(s)/helps/$(request.resource.data.help))
+          && getAfter(/databases/$(database)/documents/subjects/$(s)/helps/$(request.resource.data.help)).data.by == mySid();
+        allow update, delete: if teachesSub(s);
+      }
+    }
+  }
+}
+rules_version = '2';
 // เกมสร้างปราสาท — Firestore Security Rules
 // ราคาไอเท็มในฟังก์ชัน prices() ต้องตรงกับ ITEMS ใน js/main.js ถ้าแก้ราคา ให้แก้ทั้งสองที่
 service cloud.firestore {
