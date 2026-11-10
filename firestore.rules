@@ -22,7 +22,7 @@ service cloud.firestore {
     function dayOk(dn) { return dn is int && dn * 86400000 <= ms() + 25200000 && ms() + 25200000 < (dn + 1) * 86400000; }
 
     function growMs(c) { return {'carrot': 10800000, 'tomato': 21600000, 'cabbage': 43200000, 'pumpkin': 86400000}[c]; }
-    function animalTable() { return {'chicken': [60, 4, 'egg', 21600000], 'sheep': [120, 6, 'wool', 43200000], 'pig': [200, 8, 'bacon', 86400000], 'horse': [250, 8, 'manure', 86400000], 'fish': [40, 9, 'fish', 43200000]}; }
+    function animalTable() { return {'chicken': [60, 4, 'egg', 21600000], 'sheep': [120, 6, 'wool', 43200000], 'pig': [200, 8, 'bacon', 86400000], 'horse': [250, 8, 'manure', 86400000], 'fish': [40, 3, 'fish', 43200000]}; }
     function decorTable() { return {'d_flowers': [40, 1], 'd_scarecrow': [50, 2], 'd_mailbox': [40, 2], 'd_well': [80, 3], 'd_flag': [100, 3], 'd_hay': [60, 4], 'd_windmill': [200, 5], 'd_hive': [120, 6], 'd_greenhouse': [300, 8], 'd_tractor': [400, 9]}; }
     function oldF() { return resource.data; }
     function newF() { return request.resource.data; }

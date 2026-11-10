@@ -24,7 +24,7 @@ const ANIMALS={
  sheep:{name:'แกะ',em:'🐑',price:120,unlock:6,prod:'wool',every:12,max:4,pen:'คอกแกะ'},
  pig:{name:'หมู',em:'🐷',price:200,unlock:8,prod:'bacon',every:24,max:3,pen:'คอกหมู'},
  horse:{name:'ม้า',em:'🐴',price:250,unlock:8,prod:'manure',every:24,max:2,pen:'คอกม้า'},
- fish:{name:'ปลา',em:'🐟',price:40,unlock:9,prod:'fish',every:12,max:6,pen:'บ่อปลา'}};
+ fish:{name:'ปลา',em:'🐟',price:40,unlock:3,prod:'fish',every:12,max:6,pen:'บ่อปลา'}};
 const PRODUCTS={
  carrot:{name:'แครอท',em:'🥕',price:5},tomato:{name:'มะเขือเทศ',em:'🍅',price:10},cabbage:{name:'กะหล่ำปลี',em:'🥬',price:20},pumpkin:{name:'ฟักทอง',em:'🎃',price:40},
  egg:{name:'ไข่ไก่',em:'🥚',price:8},wool:{name:'ขนแกะ',em:'🧶',price:18},bacon:{name:'เบคอน',em:'🥓',price:40},manure:{name:'ปุ๋ยคอกม้า',em:'🌱',price:30},fish:{name:'ปลา',em:'🐟',price:15}};
@@ -39,7 +39,7 @@ const DECOR={
  d_hive:{name:'รังผึ้ง',em:'🐝',price:120,unlock:6},
  d_greenhouse:{name:'โรงเรือนกระจก',em:'🏡',price:300,unlock:8},
  d_tractor:{name:'รถแทรกเตอร์',em:'🚜',price:400,unlock:9}};
-const STAGES=['ที่ดินว่างเปล่า','ปรับที่ดิน + ทางเดินดิน','เริ่มปลูกผัก (แปลงผักผุดขึ้นมา)','สระน้ำมีปลา','บ้านไร่ + เล้าไก่ (ปลดล็อกไก่)','โรงนาแดง','คอกแกะ (ปลดล็อกแกะ)','สวนผลไม้ + ไซโล','คอกหมู + คอกม้า (ปลดล็อกหมู ม้า)','ทุ่งหญ้าครบ (ปลดล็อกปลา)','ฟาร์มสมบูรณ์แบบ'];
+const STAGES=['ที่ดินว่างเปล่า','ปรับที่ดิน + ทางเดินดิน','เริ่มปลูกผัก (แปลงผักผุดขึ้นมา)','สระน้ำมีปลา (ปลดล็อกปลา)','บ้านไร่ + เล้าไก่ (ปลดล็อกไก่)','โรงนาแดง','คอกแกะ (ปลดล็อกแกะ)','สวนผลไม้ + ไซโล','คอกหมู + คอกม้า (ปลดล็อกหมู ม้า)','ทุ่งหญ้าและทิวทัศน์ครบ','ฟาร์มสมบูรณ์แบบ'];
 const LEVELS=['ม.1','ม.2','ม.3','ม.4','ม.5','ม.6'];
 const HELP_COIN=5,HELP_QUOTA=3;
 const plotCount=stage=>Math.min(12,2+stage);
