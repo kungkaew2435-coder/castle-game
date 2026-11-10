@@ -39,7 +39,7 @@ const DECOR={
  d_hive:{name:'รังผึ้ง',em:'🐝',price:120,unlock:6},
  d_greenhouse:{name:'โรงเรือนกระจก',em:'🏡',price:300,unlock:8},
  d_tractor:{name:'รถแทรกเตอร์',em:'🚜',price:400,unlock:9}};
-const STAGES=['ที่ดินว่างเปล่า','ปรับที่ดิน + ทางเดินดิน','รั้วไม้ + แปลงผักเพิ่ม','บ้านไร่หลังน้อย','เล้าไก่ (ปลดล็อกไก่)','โรงนาแดง','คอกแกะ (ปลดล็อกแกะ)','ไซโล + สวนผลไม้','คอกหมู + คอกม้า','บ่อปลา + ท่าเทียบเรือ','ฟาร์มสมบูรณ์แบบ'];
+const STAGES=['ที่ดินว่างเปล่า','ปรับที่ดิน + ทางเดินดิน','เริ่มปลูกผัก (แปลงผักผุดขึ้นมา)','สระน้ำมีปลา','บ้านไร่ + เล้าไก่ (ปลดล็อกไก่)','โรงนาแดง','คอกแกะ (ปลดล็อกแกะ)','สวนผลไม้ + ไซโล','คอกหมู + คอกม้า (ปลดล็อกหมู ม้า)','ทุ่งหญ้าครบ (ปลดล็อกปลา)','ฟาร์มสมบูรณ์แบบ'];
 const LEVELS=['ม.1','ม.2','ม.3','ม.4','ม.5','ม.6'];
 const HELP_COIN=5,HELP_QUOTA=3;
 const plotCount=stage=>Math.min(12,2+stage);
@@ -184,11 +184,27 @@ const PH={plots:{x:6.6,y:63.2,w:48.6,h:31.8},
  zone:{chicken:[49,46,20,12],sheep:[58,28,18,12],pig:[80,52,15,8],horse:[82,19,14,11],fish:[71,66,24,18]}};
 const ph=d=>`animation-delay:-${((performance.now()/1000)%d).toFixed(2)}s`;
 const hsh=s=>{let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619);return (h>>>0)/4294967296};
-function ambient(f){
+const REVEAL=[[],
+ [[41,56,6,12],[46,78,10,14],[52,92,12,10]],
+ [[28,79,31,22]],
+ [[84,76,22,24]],
+ [[33,22,16,24],[58,50,15,13]],
+ [[60,13,16,18]],
+ [[67,35,15,13]],
+ [[13,48,17,32],[71,8,7,11],[50,4,42,9]],
+ [[85,53,14,12],[90,24,13,17]],
+ [[50,50,64,64]]];
+function revealStyle(stage){
+ if(stage>=10)return '';
+ const g=[];for(let k=1;k<=Math.min(stage,9);k++)(REVEAL[k]||[]).forEach(([x,y,rx,ry])=>g.push(`radial-gradient(ellipse ${rx}% ${ry}% at ${x}% ${y}%,#000 52%,transparent 100%)`));
+ if(!g.length)return 'opacity:0;';
+ const v=g.join(',');return `-webkit-mask-image:${v};mask-image:${v};-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;`;
+}
+function ambient(f,stage){
  let s='<div class="amb" aria-hidden="true"><i class="rays" style="'+ph(14)+'"></i><i class="cloud c1" style="'+ph(90)+'"></i><i class="cloud c2" style="'+ph(140)+'"></i>';
  [[8,70,'🐦'],[16,95,'🐦'],[5,120,'🕊️']].forEach(([top,d,e],i)=>{s+=`<b class="bird" style="top:${top+i*3}%;animation-duration:${d}s;${ph(d)}"><span style="animation-delay:-${(i*.3).toFixed(1)}s">${e}</span></b>`});
  [[22,76,34],[14,82,45]].forEach(([x,y,d],i)=>{s+=`<b class="bfly" style="left:${x}%;top:${y}%;animation-duration:${d}s;${ph(d)}">🦋</b>`});
- for(let i=0;i<6;i++)s+=`<i class="glint" style="left:${72+hsh('g'+i)*22}%;top:${66+hsh('h'+i)*18}%;animation-delay:-${(i*.7).toFixed(1)}s">✦</i>`;
+ if(stage>=3)for(let i=0;i<6;i++)s+=`<i class="glint" style="left:${72+hsh('g'+i)*22}%;top:${66+hsh('h'+i)*18}%;animation-delay:-${(i*.7).toFixed(1)}s">✦</i>`;
  const A=f&&f.animals||{};
  for(const id of Object.keys(A)){const a=A[id],k=a.k;if(!PH.zone[k])continue;const z=PH.zone[k],r1=hsh(id+'x'),r2=hsh(id+'y'),r3=hsh(id+'d');
   const dx=(r3<.5?-1:1)*(1.5+r1*3.5),dy=(r2-.5)*(k==='fish'?3:2.4),dur=k==='fish'?(9+r1*8):(14+r2*14);
@@ -196,9 +212,9 @@ function ambient(f){
  return s+'</div>';
 }
 function photoScene(f,stage,o={}){
- const P=f.plots||{},n=plotCount(stage),sat=(0.3+0.07*stage).toFixed(2),bri=(0.86+0.014*stage).toFixed(2);
- const thumb=o.cls==='thumb',style=stage>=10?'':` style="filter:saturate(${sat}) brightness(${bri})"`,tl=S.tilt||[0,0];
- let s=`<div class="pwrap"><div class="pscene${o.cls?' '+o.cls:''}" style="--px:${tl[0]};--py:${tl[1]}" role="group" aria-label="${esc(o.label||'ฟาร์ม')}"><div class="pback"><img class="pimg" src="img/farm.jpg" alt=""${style} draggable="false">${thumb?'':ambient(f)}</div>`;
+ const P=f.plots||{},n=plotCount(stage);
+ const thumb=o.cls==='thumb',rv=revealStyle(stage),style=rv?` style="${rv}"`:'',tl=S.tilt||[0,0];
+ let s=`<div class="pwrap"><div class="pscene${o.cls?' '+o.cls:''}" style="--px:${tl[0]};--py:${tl[1]}" role="group" aria-label="${esc(o.label||'ฟาร์ม')}"><div class="pback"><img class="pimg" src="img/farm.jpg" alt=""${style} draggable="false">${thumb?'':ambient(f,stage)}</div>`;
  if(o.bare)return s+'</div></div>';
  s+='<div class="pfront">';
  const play=!!o.play,pick=play&&S.pickPlot&&!P[S.pickPlot]?S.pickPlot:null,B=play?'button':'div';
@@ -206,10 +222,10 @@ function photoScene(f,stage,o={}){
  for(let i=0;i<12;i++){
   const x=PH.plots.x+(i%4)*cw,y=PH.plots.y+Math.floor(i/4)*ch,pos=`left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;width:${(cw-.7).toFixed(2)}%;height:${(ch-1.1).toFixed(2)}%`;
   const p=P['p'+i];
-  if(i>=n){s+=`<div class="ptile lock" style="${pos}" title="ปลดล็อกเมื่อคะแนนเพิ่ม">🔒</div>`;continue}
-  if(!p){s+=`<${B} class="ptile empty${pick==='p'+i?' sel':''}" style="${pos}" ${play?`data-act="pick" data-p="p${i}" aria-label="ปลูกแปลง ${i+1}"`:''}><span class="pe">＋</span></${B}>`;continue}
+  if(i>=n){s+=stage<2?`<div class="ptile ghost" style="${pos}"></div>`:`<div class="ptile lock" style="${pos}" title="ปลดล็อกเมื่อคะแนนเพิ่ม">🔒</div>`;continue}
+  if(!p){s+=`<${B} class="ptile empty${stage<2?' soil':''}${pick==='p'+i?' sel':''}" style="${pos}" ${play?`data-act="pick" data-p="p${i}" aria-label="ปลูกแปลง ${i+1}"`:''}><span class="pe">＋</span></${B}>`;continue}
   const I=plotInfo(p),C=CROPS[p.k];
-  s+=`<${B} class="ptile ${I.ready?'ready':'grow'}" style="${pos}" ${play&&I.ready?`data-act="harvest" data-p="p${i}" aria-label="เก็บเกี่ยว${C.name}"`:play?'disabled':''} title="${C.name}${I.ready?' พร้อมเก็บ':' อีก '+leftTxt(I.left)}"><span class="pe">${I.ready?C.em:'🌱'}</span><i class="pb"><u style="width:${(I.pct*100).toFixed(0)}%"></u></i>${I.ready?'<span class="spark">✨</span>':''}</${B}>`;
+  s+=`<${B} class="ptile ${I.ready?'ready':'grow'}${stage<2?' soil':''}" style="${pos}" ${play&&I.ready?`data-act="harvest" data-p="p${i}" aria-label="เก็บเกี่ยว${C.name}"`:play?'disabled':''} title="${C.name}${I.ready?' พร้อมเก็บ':' อีก '+leftTxt(I.left)}"><span class="pe">${I.ready?C.em:'🌱'}</span><i class="pb"><u style="width:${(I.pct*100).toFixed(0)}%"></u></i>${I.ready?'<span class="spark">✨</span>':''}</${B}>`;
  }
  for(const k of Object.keys(ANIMALS)){
   const A_=ANIMALS[k],q=PH.pen[k],list=animalsOf(f,k),ready=list.filter(id=>animInfo(f.animals[id]).ready);
@@ -220,7 +236,7 @@ function photoScene(f,stage,o={}){
  }
  const deco=(f.inv||[]).filter(id=>DECOR[id]);
  if(deco.length)s+=`<div class="pdeco" title="ของตกแต่ง">${deco.map(id=>`<span title="${esc(DECOR[id].name)}">${DECOR[id].em}</span>`).join('')}</div>`;
- s+=`<div class="pstage">ขั้น ${stage}/10</div>`;
+ s+=`<div class="pstage">ขั้น ${stage}/10 · ${esc(STAGES[stage])}</div>`;
  if(pick){const i=+pick.slice(1);s+=`<div class="seedbar"><b>แปลง ${i+1}</b>${Object.keys(CROPS).map(k=>`<button class="seed" data-act="plant" data-p="${pick}" data-k="${k}"><span>${CROPS[k].em}</span><small>${CROPS[k].name} · ${CROPS[k].grow}ชม.</small></button>`).join('')}<button class="btn sm ghost" data-act="pick" data-p="">ยกเลิก</button></div>`}
  return s+'</div></div></div>';
 }
