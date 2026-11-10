@@ -243,7 +243,7 @@ function photoScene(f,stage,o={}){
 
 /* ---------- views ---------- */
 const coinChip=n=>`<span class="chip gold num"><i class="coin"></i>${fmt(n)} เหรียญ</span>`;
-const ICON={home:'🏠',farm:'🌾',sell:'💰',shop:'🛒',visit:'🤝',quests:'🎯',sales:'💰',approve:'📝',farms:'🧑‍🌾',settings:'⚙️',rooms:'🏫',import:'📥',cards:'🪪',teachers:'👩‍🏫'};
+const ICON={home:'🏠',farm:'🌾',sell:'💰',shop:'🛒',visit:'🤝',quests:'🎯',sales:'💰',approve:'📝',farms:'🧑‍🌾',settings:'⚙️',rooms:'🏫',import:'📥',cards:'🪪',teachers:'👩‍🏫',clear:'🧹'};
 
 function loginView(){
  if(S.boot==='noconfig')return `<div class="panel"><h1>ยังไม่ได้ตั้งค่า Firebase</h1><p>เปิดไฟล์ <code>js/config.js</code> แล้ววางค่า firebaseConfig ของโปรเจกต์ ตามคู่มือใน README</p></div>`;
@@ -584,10 +584,84 @@ async function readRoster(file){let rows;
   if(id&&!seenId.has(id))seenId.set(id,o.line);if(room&&no)seenNo.add(room+'#'+no);out.push(o)});
  return out}
 
+
+/* ---------- ล้างข้อมูลภาคเรียน (ผู้ดูแลระบบ) ---------- */
+const CLR_COLS={history:['helps','visits','claims'],reset:['progress','farms','stats','claims','sales','helps','visits'],delete:['quests','progress','farms','stats','claims','sales','helps','visits']};
+const CLR_NAME={quests:'ภารกิจ',progress:'คะแนน',farms:'ฟาร์ม',stats:'สถิติ',claims:'คำขอ',sales:'รายการขาย',helps:'การช่วยเพื่อน',visits:'การเยี่ยม'};
+const CLR_MODE={history:['🧹 ล้างเฉพาะประวัติ','ลบประวัติเยี่ยมฟาร์ม/ช่วยเพื่อน/คำขอ เก็บฟาร์ม คะแนน และการขายไว้ (ประหยัดพื้นที่แบบเบา)'],reset:['♻️ เริ่มภาคเรียนใหม่ในวิชาเดิม','ลบคะแนน ฟาร์ม สถิติ การขาย และประวัติทั้งหมด แต่เก็บวิชา ภารกิจ และการตั้งค่าไว้ ครูใช้ต่อได้ทันที'],delete:['🗑️ ลบวิชานี้ทั้งหมด','ลบทุกอย่างรวมถึงตัววิชาและภารกิจ ใช้เมื่อวิชานี้จบแล้วและไม่ใช้อีก']};
+const jsonSafe=(k,v)=>v&&typeof v==='object'&&typeof v.toDate==='function'?v.toDate().toISOString():v;
+function clrState(){const A=S.adm;if(!A.clr)A.clr={list:null,sel:{},mode:'reset',busy:false,log:'',ok:false};return A.clr}
+async function loadClear(){
+ const K=clrState();K.list=null;K.log='';soon();
+ try{if(!S.teachers.length)await loadTeachers();
+  const snap=await getDocs(C('subjects'));const out=[];
+  for(const d of snap.docs){const x=d.data(),s=x.settings||{},cnt={};
+   await Promise.all(CLR_COLS.delete.map(async c=>{cnt[c]=(await getDocs(C('subjects',d.id,c))).docs.length}));
+   out.push({id:d.id,name:s.subject||'(ไม่มีชื่อ)',code:s.code||'',term:s.term||'ไม่ระบุภาคเรียน',rooms:x.rooms||[],teachers:(x.teacherUids||[]).map(u=>(S.teachers.find(t=>t.uid===u)||{}).name||'ผู้ดูแล/ไม่ทราบ'),cnt,total:Object.values(cnt).reduce((a,b)=>a+b,0)+1})}
+  out.sort((a,b)=>String(b.term).localeCompare(String(a.term),'th')||String(a.name).localeCompare(String(b.name),'th'));K.list=out}
+ catch(e){K.list=[];fail(e,'โหลดรายการวิชาไม่สำเร็จ')}
+ soon();
+}
+function aClear(){
+ const K=clrState();
+ if(K.list===null)return `<div class="panel"><h2>🧹 ล้างข้อมูลภาคเรียน</h2><p class="muted">กำลังนับข้อมูลของแต่ละวิชา...</p></div>`;
+ const terms=[...new Set(K.list.map(x=>x.term))];
+ const chosen=K.list.filter(x=>K.sel[x.id]);
+ const docs=chosen.reduce((a,x)=>a+(K.mode==='delete'?x.total:CLR_COLS[K.mode].reduce((b,c)=>b+x.cnt[c],0)),0);
+ const rows=K.list.map(x=>`<label class="item" style="cursor:pointer"><input type="checkbox" data-act-change="clr-sel" data-id="${esc(x.id)}" ${K.sel[x.id]?'checked':''} ${K.busy?'disabled':''}>
+  <div class="grow"><b>${esc(x.name)}</b> <span class="small muted">${esc(x.code)} · ${esc(x.term)}</span><div class="small muted">ห้อง ${esc(x.rooms.join(', ')||'-')} · ครู ${esc(x.teachers.join(', ')||'-')}</div>
+  <div class="chips">${CLR_COLS.delete.filter(c=>x.cnt[c]).map(c=>`<span class="chip num">${CLR_NAME[c]} ${x.cnt[c]}</span>`).join('')||'<span class="chip">ไม่มีข้อมูลเกม</span>'}</div></div><span class="chip num">${x.total} รายการ</span></label>`).join('')||'<p class="muted">ยังไม่มีวิชาในระบบ</p>';
+ const modes=Object.keys(CLR_MODE).map(k=>`<button class="btn ${K.mode===k?'primary':''}" data-act="clr-mode" data-m="${k}" ${K.busy?'disabled':''}>${CLR_MODE[k][0]}</button>`).join('');
+ return `<div class="panel" style="display:flex;flex-direction:column;gap:12px"><h2>🧹 ล้างข้อมูลภาคเรียน</h2>
+  <p class="small muted" style="margin:0">ข้อมูลฟาร์ม การขาย และการเยี่ยมของแต่ละวิชาสะสมเรื่อย ๆ จนกินพื้นที่ฐานข้อมูล เลือกวิชาที่จบภาคเรียนแล้วเพื่อล้างได้ที่นี่ ข้อมูลที่ลบแล้วกู้คืนไม่ได้ จึงมีไฟล์สำรองให้ดาวน์โหลดก่อน รายชื่อนักเรียน บัตร QR และบัญชีครูจะไม่ถูกลบ</p>
+  <div class="banner warn"><b>ก่อนล้าง</b><span class="small">ให้ครูและนักเรียนปิดเว็บก่อน (ถ้าเปิดค้างไว้ ข้อมูลบางส่วนอาจถูกสร้างกลับมา)</span></div>
+  <div class="row small"><span class="muted">เลือกทั้งภาคเรียน:</span>${terms.map(tm=>`<button class="btn sm" data-act="clr-term" data-t="${esc(tm)}" ${K.busy?'disabled':''}>${esc(tm)}</button>`).join('')}<button class="btn sm ghost" data-act="clr-term" data-t="" ${K.busy?'disabled':''}>ยกเลิกทั้งหมด</button></div>
+  <div class="list">${rows}</div></div>
+ <div class="panel" style="display:flex;flex-direction:column;gap:12px"><h2>วิธีล้าง</h2><div class="row">${modes}</div><p class="small" style="margin:0">${esc(CLR_MODE[K.mode][1])}</p>
+  <div class="row"><button class="btn" data-act="clr-backup" ${chosen.length&&!K.busy?'':'disabled'}>⬇️ ดาวน์โหลดไฟล์สำรอง (${chosen.length} วิชา)</button></div>
+  <label class="row small" style="gap:6px"><input type="checkbox" data-act-change="clr-ok" ${K.ok?'checked':''} ${K.busy?'disabled':''}> ฉันสำรองข้อมูลแล้ว และเข้าใจว่าลบแล้วกู้คืนไม่ได้</label>
+  <label class="field"><span>พิมพ์คำว่า <b>ล้างข้อมูล</b> เพื่อยืนยัน</span><input type="text" id="clr-confirm" autocomplete="off" placeholder="ล้างข้อมูล" ${K.busy?'disabled':''}></label>
+  <div class="row"><button class="btn primary" style="background:var(--crit);border-color:var(--crit)" data-act="clr-run" ${chosen.length&&!K.busy?'':'disabled'}>${K.busy?'กำลังล้าง...':`ล้างข้อมูล ${chosen.length} วิชา (${docs} รายการ)`}</button></div>
+  ${K.log?`<pre class="small" style="margin:0;white-space:pre-wrap;background:var(--soft);padding:10px;border-radius:12px">${esc(K.log)}</pre>`:''}</div>`;
+}
+async function clrBackup(){
+ const K=clrState(),ids=K.list.filter(x=>K.sel[x.id]);if(!ids.length)return;
+ K.log='กำลังรวบรวมข้อมูลสำรอง...';soon();
+ try{const out={exportedAt:new Date().toISOString(),subjects:{}};
+  for(const x of ids){const sd=await getDoc(D('subjects',x.id));const o={doc:sd.data()||{}};
+   for(const c of CLR_COLS.delete){const sn=await getDocs(C('subjects',x.id,c));o[c]={};sn.docs.forEach(d=>{o[c][d.id]=d.data()})}
+   out.subjects[x.id]=o}
+  const blob=new Blob([JSON.stringify(out,jsonSafe,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`สำรองข้อมูลฟาร์ม-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  K.log=`ดาวน์โหลดไฟล์สำรอง ${ids.length} วิชาแล้ว`}
+ catch(e){K.log='';fail(e,'สำรองข้อมูลไม่สำเร็จ')}
+ soon();
+}
+async function wipeCol(sub,col,K){
+ const sn=await getDocs(C('subjects',sub,col));let n=0;
+ for(let i=0;i<sn.docs.length;i+=400){const b=writeBatch(db);sn.docs.slice(i,i+400).forEach(d=>b.delete(d.ref));await b.commit();n+=Math.min(400,sn.docs.length-i)}
+ return n;
+}
+async function clrRun(){
+ const K=clrState(),ids=K.list.filter(x=>K.sel[x.id]);
+ const word=(document.getElementById('clr-confirm')||{}).value||'';
+ if(!ids.length)return;
+ if(!K.ok){toast('ติ๊กยืนยันว่าสำรองข้อมูลแล้วก่อน');return}
+ if(word.trim()!=='ล้างข้อมูล'){toast('พิมพ์คำว่า ล้างข้อมูล ให้ถูกต้องก่อน');return}
+ K.busy=true;K.log='เริ่มล้างข้อมูล...\n';soon();
+ try{let total=0;
+  for(const x of ids){K.log+=`\n▶ ${x.name} (${x.term})\n`;soon();
+   for(const c of CLR_COLS[K.mode]){const n=await wipeCol(x.id,c,K);total+=n;if(n)K.log+=`  ลบ${CLR_NAME[c]} ${n} รายการ\n`;soon()}
+   if(K.mode==='delete'){await deleteDoc(D('subjects',x.id));total++;K.log+='  ลบตัววิชาแล้ว\n'}
+   else if(K.mode==='reset'){await updateDoc(D('subjects',x.id),{clearedAt:serverTimestamp()}).catch(()=>{})}}
+  K.log+=`\n✅ เสร็จแล้ว ลบทั้งหมด ${total} รายการ`;K.sel={};K.ok=false;toast('ล้างข้อมูลเสร็จแล้ว')}
+ catch(e){K.log+=`\n❌ หยุดกลางคัน: ${e&&e.message||e}`;fail(e,'ล้างข้อมูลไม่สำเร็จ')}
+ K.busy=false;
+ const keep=K.log;await loadClear();K.log=keep;soon();
+}
 function adminApp(){
- if(!['home','rooms','import','cards','teachers'].includes(S.tab))S.tab='rooms';
- const body={home:homeView,rooms:aRooms,import:aImport,cards:aCards,teachers:aTeachers}[S.tab]();
- return shell([['home','หน้าแรก'],['rooms','ห้องเรียนกลาง'],['import','นำเข้ารายชื่อ'],['cards','บัตร QR'],['teachers','บัญชีครู']],body);
+ if(!['home','rooms','import','cards','teachers','clear'].includes(S.tab))S.tab='rooms';
+ const body={home:homeView,rooms:aRooms,import:aImport,cards:aCards,teachers:aTeachers,clear:aClear}[S.tab]();
+ return shell([['home','หน้าแรก'],['rooms','ห้องเรียนกลาง'],['import','นำเข้ารายชื่อ'],['cards','บัตร QR'],['teachers','บัญชีครู'],['clear','ล้างข้อมูล']],body);
 }
 function aTeachers(){const A=S.adm;
  if(!A.newPw)A.newPw=randPwd(8);
@@ -895,7 +969,7 @@ const A={
  reload(){location.reload();return false},
  logout(){closeScanner();signOut(auth);return false},
  'role-swap'(){S.user.role=S.user.role==='admin'?'teacher':'admin';S.tab=S.user.role==='admin'?'rooms':(S.subId==='__none'?'settings':'home')},
- tab(d){S.tab=d.k;if(S.user.role==='admin'&&d.k==='teachers')loadTeachers().then(soon).catch(e=>fail(e))},
+ tab(d){S.tab=d.k;if(S.user.role==='admin'&&d.k==='teachers')loadTeachers().then(soon).catch(e=>fail(e));if(S.user.role==='admin'&&d.k==='clear')loadClear()},
  lbsort(d){S.lbSort=d.v},
  /* นักเรียน: ฟาร์ม */
  plant(d){const f=farmOf(S.user.id);if(f.plots[d.p]||!(+d.p.slice(1)<plotCount(f.stage)))return false;
@@ -908,6 +982,10 @@ const A={
   seq(ks,k=>updateDoc(meFarmRef(),{[`plots.${k}`]:deleteField(),[`stock.${f.plots[k].k}`]:increment(1)}),n=>`เก็บเกี่ยว ${n} แปลงแล้ว`);return false},
  collect(d){const f=farmOf(S.user.id),a=f.animals[d.a];if(!a||!animInfo(a).ready)return false;const pr=ANIMALS[a.k].prod;
   updateDoc(meFarmRef(),{[`animals.${d.a}.t`]:serverTimestamp(),[`stock.${pr}`]:increment(1)}).then(()=>toast(`ได้${PRODUCTS[pr].name}แล้ว`)).catch(e=>fail(e,'เก็บผลผลิตไม่สำเร็จ'));return false},
+ 'clr-mode'(d){clrState().mode=d.m},
+ 'clr-term'(d){const K=clrState();K.sel={};if(d.t)K.list.filter(x=>x.term===d.t).forEach(x=>{K.sel[x.id]=true})},
+ 'clr-backup'(){clrBackup();return false},
+ 'clr-run'(){clrRun();return false},
  pick(d){S.pickPlot=d.p||null},
  'collect-kind'(d){const f=farmOf(S.user.id);const ks=Object.keys(f.animals).filter(k=>f.animals[k].k===d.k&&animInfo(f.animals[k]).ready);
   seq(ks,k=>updateDoc(meFarmRef(),{[`animals.${k}.t`]:serverTimestamp(),[`stock.${ANIMALS[d.k].prod}`]:increment(1)}),n=>`เก็บผลผลิต ${n} รายการแล้ว`);return false},
@@ -1014,6 +1092,8 @@ document.addEventListener('change',e=>{const t=e.target;
  if(t.dataset.g){gridChange(t);return}
  if(t.dataset.sell){const k=t.dataset.sell;S.sell[k]=Math.max(0,Math.min(availOf(S.user.id,k),Math.floor(+t.value||0)));render();return}
  if(t.dataset.price){const k=t.dataset.price;if(!S.settings.prices)S.settings.prices={};S.settings.prices[k]=Math.max(0,Math.round(+t.value||0));saveSub();render();return}
+ if(t.dataset.actChange==='clr-sel'){clrState().sel[t.dataset.id]=t.checked;render();return}
+ if(t.dataset.actChange==='clr-ok'){clrState().ok=t.checked;render();return}
  if(t.dataset.actChange==='personal'){S.personal=t.checked;return}
  if(t.dataset.actChange==='scanfile'){const f=t.files&&t.files[0];if(f)scanImage(f);return}
  if(t.dataset.actChange==='impfile'){const f=t.files&&t.files[0];if(!f)return;toast('กำลังอ่านไฟล์...');render();readRoster(f).then(rows=>{S.adm.imp={file:f.name,rows};render()}).catch(e=>{toast(e.message==='head'?'ไม่พบหัวคอลัมน์ "เลขประจำตัว" ในไฟล์ ใช้แม่แบบแล้วลองใหม่':'อ่านไฟล์ไม่สำเร็จ ลองบันทึกเป็น .csv แล้วอัปโหลดใหม่');render()});return}
